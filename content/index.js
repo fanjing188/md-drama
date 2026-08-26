@@ -3,6 +3,14 @@
 let activeScroller = null;
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'showToast') {
+    if (typeof window.showGlobalToast === 'function') {
+      window.showGlobalToast(request.message, request.type || 'success');
+    }
+    sendResponse({ success: true });
+    return true;
+  }
+
   if (request.action === 'startAutoScroll') {
     activeScroller = new SmartScroller({
       interval: request.interval || 150,

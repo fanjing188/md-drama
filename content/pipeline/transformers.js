@@ -1,4 +1,4 @@
-// content/pipeline/transformers.js - 通用复杂结构 DOM 重塑器
+// content/pipeline/transformers.js - 通用复杂结构 DOM 重塑与穿透器
 
 class TransformersRegistry {
   constructor() {
@@ -10,8 +10,63 @@ class TransformersRegistry {
     this.transformers.push(transformer);
   }
 
-  // 1. 数学公式还原 (KaTeX & MathJax)
+  // 递归穿透 Shadow DOM 获取所有元素
+  static getAllElementsIncludingShadow(root) {
+    const elements = [];
+    function traverse(node) {
+      if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
+      elements.push(node);
+
+      if (node.shadowRoot) {
+        Array.from(node.shadowRoot.children).forEach(child => traverse(child));
+      }
+
+      Array.from(node.children).forEach(child => traverse(child));
+    }
+    traverse(root);
+    return elements;
+  }
+
   registerDefaultTransformers() {
+    // 1. 固定悬浮物降权/剔除 (Sticky & Fixed Elements)
+    this.register({
+      name: 'fixed-sticky-remover',
+      match: (node) => {
+        if (typeof window === 'undefined' || !window.getComputedStyle) return false;
+        if (node.tagName === 'BODY' || node.tagName === 'HTML' || node.tagName === 'MAIN' || node.tagName === 'ARTICLE') return false;
+        try {
+          const style = window.getComputedStyle(node);
+          const pos = style.position;
+          return (pos === 'fixed' || pos === 'sticky') && (node.clientHeight < 120 || node.clientWidth < 120);
+        } catch (e) {
+          return false;
+        }
+      },
+      transform: (node) => {
+        node.remove();
+      }
+    });
+
+    // 2. Canvas 动态图表转存为 <img>
+    this.register({
+      name: 'canvas-to-image-converter',
+      match: (node) => node.tagName === 'CANVAS',
+      transform: (node) => {
+        try {
+          const dataUrl = node.toDataURL('image/png');
+          if (dataUrl && dataUrl.length > 100) {
+            const img = document.createElement('img');
+            img.src = dataUrl;
+            img.alt = 'rendered-chart';
+            node.parentNode.replaceChild(img, node);
+          }
+        } catch (e) {
+          // canvas 跨域污染时跳过
+        }
+      }
+    });
+
+    // 3. 数学公式还原 (KaTeX & MathJax)
     this.register({
       name: 'math-formula-restorer',
       match: (node) => {
@@ -24,7 +79,6 @@ class TransformersRegistry {
         );
       },
       transform: (node) => {
-        // 查找原始 TeX 标注
         let tex = node.getAttribute('data-math') ||
                   node.getAttribute('data-latex') ||
                   node.querySelector('annotation[encoding*="tex"]')?.textContent ||
@@ -40,18 +94,16 @@ class TransformersRegistry {
       }
     });
 
-    // 2. 代码块去噪（移除复制按钮、行号）
+    // 4. 代码块去噪（移除复制按钮、行号）
     this.register({
       name: 'code-block-normalizer',
       match: (node) => {
         return node.tagName === 'PRE' || (node.classList && (node.classList.contains('highlight') || node.classList.contains('code-block')));
       },
       transform: (node) => {
-        // 移除行号列
         const lineNumbers = node.querySelectorAll('.line-numbers, .linenumber, .line-num, .gutter, .hljs-ln-numbers, .copy-code-btn, .code-copy-button');
         lineNumbers.forEach(el => el.remove());
 
-        // 提取语言标记
         const codeEl = node.querySelector('code') || node;
         let lang = '';
         const classNames = (codeEl.className + ' ' + node.className).split(/\s+/);
@@ -68,7 +120,7 @@ class TransformersRegistry {
       }
     });
 
-    // 3. Flex/Grid 伪表格重构为标准 HTML Table
+    // 5. Flex/Grid 伪表格重构
     this.register({
       name: 'pseudo-table-reconstructor',
       match: (node) => {
@@ -101,7 +153,7 @@ class TransformersRegistry {
       }
     });
 
-    // 4. 修复 CSS background-image 为真实 <img>
+    // 6. CSS background-image 还原为 <img>
     this.register({
       name: 'background-image-restorer',
       match: (node) => {
@@ -121,7 +173,7 @@ class TransformersRegistry {
       }
     });
 
-    // 5. 提示块/Callout 语义转换
+    // 7. 提示块/Callout 语义转换
     this.register({
       name: 'callout-block-normalizer',
       match: (node) => {
@@ -139,18 +191,19 @@ class TransformersRegistry {
     });
   }
 
-  // 递归处理 DOM 树
   apply(root) {
     if (!root) return;
 
     for (const transformer of this.transformers) {
-      // 遍历匹配
-      const candidates = Array.from(root.querySelectorAll('*')).filter(el => transformer.match(el));
-      if (transformer.match(root)) candidates.unshift(root);
+      const allElements = Array.from(root.querySelectorAll('*'));
+      if (transformer.match(root)) allElements.unshift(root);
 
-      for (const el of candidates) {
+      for (const el of allElements) {
+        if (!el.parentNode && el !== root) continue;
         try {
-          transformer.transform(el);
+          if (transformer.match(el)) {
+            transformer.transform(el);
+          }
         } catch (err) {
           console.warn(`Transformer [${transformer.name}] error:`, err);
         }
