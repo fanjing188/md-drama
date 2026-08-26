@@ -7,7 +7,8 @@ class UniversalParserEngine {
       imageMode: 'download',
       attachmentFolder: 'attachments',
       panguSpacing: true,
-      includeFrontmatter: true
+      includeFrontmatter: true,
+      autoWikilinks: [] // 关键词双链自动匹配词库
     }, options);
 
     this.transformersRegistry = new TransformersRegistry();
@@ -68,6 +69,10 @@ class UniversalParserEngine {
       // 中文与行内代码
       .replace(/([\u4e00-\u9fa5])(`)/g, '$1 $2')
       .replace(/(`)([\u4e00-\u9fa5])/g, '$1 $2');
+  }
+
+  escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   // 标题层级平滑
@@ -153,11 +158,20 @@ class UniversalParserEngine {
     // 阶段 5: AST / Markdown 序列化
     let markdown = this.turndownService.turndown(clone.innerHTML);
 
-    // 阶段 6: 文本去噪与排版优化 (Post-Linter)
+    // 阶段 6: 文本去噪、双链注入与排版优化 (Post-Linter)
     if (this.cleaner && this.options.enableCleaning) {
       markdown = this.cleaner.cleanMarkdown(markdown);
     }
     markdown = this.applyPanguSpacing(markdown);
+
+    // 关键词自动转 Obsidian 双链 [[WikiLinks]]
+    if (this.options.autoWikilinks && Array.isArray(this.options.autoWikilinks)) {
+      for (const kw of this.options.autoWikilinks) {
+        if (!kw || kw.length < 2) continue;
+        const kwRegex = new RegExp(`(?<!\\[\\[)(${this.escapeRegExp(kw)})(?!\\]\\])`, 'g');
+        markdown = markdown.replace(kwRegex, '[[$1]]');
+      }
+    }
 
     // 组装 Frontmatter
     if (this.options.includeFrontmatter && metadata.title) {

@@ -94,6 +94,58 @@ class TransformersRegistry {
       }
     });
 
+    // 4. Mermaid 图表语法提取与原生还原
+    this.register({
+      name: 'mermaid-diagram-restorer',
+      match: (node) => {
+        if (!node.classList) return false;
+        return node.classList.contains('mermaid') || 
+               node.hasAttribute('data-mermaid') || 
+               node.classList.contains('mermaid-diagram') ||
+               (node.tagName === 'PRE' && node.className.includes('mermaid'));
+      },
+      transform: (node) => {
+        const rawMermaid = node.getAttribute('data-mermaid') || 
+                           node.getAttribute('data-content') || 
+                           node.textContent;
+        if (rawMermaid) {
+          const pre = document.createElement('pre');
+          pre.setAttribute('data-lang', 'mermaid');
+          pre.textContent = rawMermaid.trim();
+          if (node.parentNode) {
+            node.parentNode.replaceChild(pre, node);
+          }
+        }
+      }
+    });
+
+    // 5. 代码 Diff 差异对比还原
+    this.register({
+      name: 'code-diff-normalizer',
+      match: (node) => {
+        if (!node.classList) return false;
+        return node.classList.contains('diff-table') || node.classList.contains('diff-container');
+      },
+      transform: (node) => {
+        const lines = node.querySelectorAll('tr, .diff-line');
+        if (lines.length > 0) {
+          let diffText = '';
+          lines.forEach(line => {
+            const isAdd = line.classList.contains('blob-code-addition') || line.querySelector('.blob-code-addition');
+            const isDel = line.classList.contains('blob-code-deletion') || line.querySelector('.blob-code-deletion');
+            const prefix = isAdd ? '+ ' : (isDel ? '- ' : '  ');
+            diffText += prefix + line.textContent.trim().replace(/^[+-]\s*/, '') + '\n';
+          });
+          const pre = document.createElement('pre');
+          pre.setAttribute('data-lang', 'diff');
+          pre.textContent = diffText.trim();
+          if (node.parentNode) {
+            node.parentNode.replaceChild(pre, node);
+          }
+        }
+      }
+    });
+
     // 4. 代码块去噪（移除复制按钮、行号）
     this.register({
       name: 'code-block-normalizer',

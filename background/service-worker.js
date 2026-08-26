@@ -23,6 +23,15 @@ const DEFAULT_SETTINGS = {
     "点击下方名片",
     "一键三连"
   ],
+  // 关键词自动转双链词库
+  autoWikilinks: [
+    "Obsidian",
+    "SEO",
+    "出海",
+    "SaaS",
+    "飞书",
+    "生财有术"
+  ],
   // 智能域名分流配置 (Domain Routing)
   domainRouting: [
     { domain: "feishu.cn", path: "03-知识库/工作文档" },
@@ -292,6 +301,7 @@ async function fetchImageAsBase64(url) {
 async function ensureContentScripts(tabId) {
   const scripts = [
     'utils/logger.js',
+    'utils/sync-queue.js',
     'lib/turndown.js',
     'lib/turndown-plugin-gfm.js',
     'lib/readability.js',
