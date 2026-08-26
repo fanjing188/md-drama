@@ -11,16 +11,30 @@ class SmartScroller {
     this.isCancelled = false;
   }
 
-  // 寻找真正的滚动容器（支持 window 以及包含大量子元素的 overflow 容器，如飞书、知识星球）
+  // 寻找真正的滚动容器（支持 window 以及包含大量子元素的 overflow 容器，如飞书、知识星球、Notion、语雀）
   findScrollContainer() {
-    // 飞书文档特定容器
-    const feishuEditor = document.querySelector('.bear-web-editor') || 
-                         document.querySelector('.docx-editor') || 
-                         document.querySelector('.doc-page-container') ||
-                         document.querySelector('.editor-container');
-    if (feishuEditor) return feishuEditor;
+    // 专用适配容器清单
+    const customSelectors = [
+      '.bear-web-editor',          // 飞书文档
+      '.docx-editor',             // 飞书新版 Docx
+      '.doc-page-container',      // 飞书页面容器
+      '.topic-list',              // 生财有术 / 知识星球
+      '.topic-detail',            // 知识星球长贴
+      '.notion-scroller',         // Notion
+      '.ne-doc-major-viewer',     // 语雀文档
+      '.lake-content-editor',     // 语雀旧版
+      '.Question-main',           // 知乎问答
+      '.RichContent-inner'        // 知乎回答
+    ];
 
-    // 检查常见带有可滚动属性的根容器
+    for (const sel of customSelectors) {
+      const el = document.querySelector(sel);
+      if (el && el.scrollHeight > el.clientHeight + 50) {
+        return el;
+      }
+    }
+
+    // 检查通用带有可滚动属性的根容器
     const allDivs = Array.from(document.querySelectorAll('div, section, main, article'));
     let bestContainer = null;
     let maxScrollHeight = 0;

@@ -312,6 +312,11 @@ async function ensureContentScripts(tabId) {
     'content/adapters/generic.js',
     'content/adapters/feishu.js',
     'content/adapters/shengcai.js',
+    'content/adapters/wechat.js',
+    'content/adapters/zhihu.js',
+    'content/adapters/yuque.js',
+    'content/adapters/notion.js',
+    'content/adapters/juejin.js',
     'content/extractor.js',
     'content/ui/bubble.js',
     'content/index.js'

@@ -27,14 +27,16 @@ class DramaExtractor {
     });
   }
 
+  // 优先按专用站点适配器匹配，未命中则走强大的通用 Readability + 语义流水线解析
   getAdapter() {
     const url = window.location.href;
-    if (typeof FeishuAdapter !== 'undefined' && FeishuAdapter.matches(url)) {
-      return FeishuAdapter;
-    }
-    if (typeof ShengcaiAdapter !== 'undefined' && ShengcaiAdapter.matches(url)) {
-      return ShengcaiAdapter;
-    }
+    if (typeof FeishuAdapter !== 'undefined' && FeishuAdapter.matches(url)) return FeishuAdapter;
+    if (typeof ShengcaiAdapter !== 'undefined' && ShengcaiAdapter.matches(url)) return ShengcaiAdapter;
+    if (typeof WechatAdapter !== 'undefined' && WechatAdapter.matches(url)) return WechatAdapter;
+    if (typeof ZhihuAdapter !== 'undefined' && ZhihuAdapter.matches(url)) return ZhihuAdapter;
+    if (typeof YuqueAdapter !== 'undefined' && YuqueAdapter.matches(url)) return YuqueAdapter;
+    if (typeof NotionAdapter !== 'undefined' && NotionAdapter.matches(url)) return NotionAdapter;
+    if (typeof JuejinAdapter !== 'undefined' && JuejinAdapter.matches(url)) return JuejinAdapter;
     return GenericAdapter;
   }
 

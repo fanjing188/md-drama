@@ -56,6 +56,18 @@ class UniversalParserEngine {
       }
     });
 
+    // 块引用与 Callout 规则
+    service.addRule('blockquotes', {
+      filter: 'blockquote',
+      replacement: (content) => {
+        let text = content.trim();
+        // 还原 Obsidian Callout 语法
+        text = text.replace(/\\\[!NOTE\\\]/g, '[!NOTE]').replace(/\*\*\[!NOTE\]\*\*/g, '[!NOTE]');
+        const lines = text.split('\n');
+        return '\n\n' + lines.map(line => `> ${line.replace(/^>\s*/, '')}`).join('\n') + '\n\n';
+      }
+    });
+
     return service;
   }
 

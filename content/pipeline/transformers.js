@@ -237,8 +237,10 @@ class TransformersRegistry {
       },
       transform: (node) => {
         const bq = document.createElement('blockquote');
-        bq.innerHTML = `<strong>[!NOTE]</strong>\n${node.innerHTML}`;
-        node.parentNode.replaceChild(bq, node);
+        bq.innerHTML = `<strong>[!NOTE]</strong><br>${node.innerHTML}`;
+        if (node.parentNode) {
+          node.parentNode.replaceChild(bq, node);
+        }
       }
     });
   }
