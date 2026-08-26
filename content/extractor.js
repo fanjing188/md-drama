@@ -6,10 +6,15 @@ class DramaExtractor {
       includeFrontmatter: true,
       imageHandling: 'download',
       attachmentFolder: 'attachments',
-      enableCallouts: true
+      enableCallouts: true,
+      enableCleaning: true,
+      removeNoiseWords: true,
+      removeRedundantBlankLines: true,
+      customBlacklist: []
     }, settings);
 
     this.turndownService = this.initTurndown();
+    this.cleaner = (typeof ContentCleaner !== 'undefined') ? new ContentCleaner(this.settings) : null;
   }
 
   initTurndown() {
@@ -56,7 +61,12 @@ class DramaExtractor {
   async extract() {
     const adapter = this.getAdapter();
     const metadata = adapter.getMetadata();
-    const contentElement = adapter.extractContent();
+    let contentElement = adapter.extractContent();
+
+    // DOM 层面清洗噪声广告和无用浮层
+    if (this.cleaner && this.settings.enableCleaning) {
+      contentElement = this.cleaner.cleanDOM(contentElement);
+    }
 
     // 提取并清洗所有图片
     const images = [];
@@ -92,6 +102,11 @@ class DramaExtractor {
     }
 
     let markdown = this.turndownService.turndown(contentElement.innerHTML);
+
+    // Markdown 层面清洗套话/废话词与多余空行
+    if (this.cleaner && this.settings.enableCleaning) {
+      markdown = this.cleaner.cleanMarkdown(markdown);
+    }
 
     // 组装 Frontmatter
     if (this.settings.includeFrontmatter) {

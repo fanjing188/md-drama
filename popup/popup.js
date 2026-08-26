@@ -50,6 +50,7 @@ async function ensureContentScripts(tabId) {
     'lib/turndown.js',
     'lib/turndown-plugin-gfm.js',
     'lib/readability.js',
+    'content/cleaner.js',
     'content/scroller.js',
     'content/adapters/generic.js',
     'content/adapters/feishu.js',

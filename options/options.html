@@ -50,6 +50,37 @@
       </div>
 
       <div class="card">
+        <h3>内容智能清洗与去噪</h3>
+
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="enableCleaning" checked> 启用内容智能清洗 (过滤广告/废话/噪声)
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="removeNoiseWords" checked> 过滤常见引流话术（点赞关注/转发/打赏/营销套话）
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="removeRedundantBlankLines" checked> 清理多余空行与格式规范化
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label for="customBlacklist">自定义过滤词/正则列表 (每行一个)</label>
+          <textarea id="customBlacklist" rows="4" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #D1D5DB; font-size: 13px;" placeholder="例如：
+关注公众号
+长按二维码
+/免责声明：.*?$/"></textarea>
+          <div class="hint">支持普通文本或正则表达式（以 / 开头结尾）。</div>
+        </div>
+      </div>
+
+      <div class="card">
         <h3>排版与媒体规则</h3>
 
         <div class="form-group">

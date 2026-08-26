@@ -17,6 +17,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (items.imageHandling) document.getElementById('imageHandling').value = items.imageHandling;
     if (items.includeFrontmatter !== undefined) document.getElementById('includeFrontmatter').checked = items.includeFrontmatter;
     if (items.enableCallouts !== undefined) document.getElementById('enableCallouts').checked = items.enableCallouts;
+    if (items.enableCleaning !== undefined) document.getElementById('enableCleaning').checked = items.enableCleaning;
+    if (items.removeNoiseWords !== undefined) document.getElementById('removeNoiseWords').checked = items.removeNoiseWords;
+    if (items.removeRedundantBlankLines !== undefined) document.getElementById('removeRedundantBlankLines').checked = items.removeRedundantBlankLines;
+    if (items.customBlacklist && Array.isArray(items.customBlacklist)) {
+      document.getElementById('customBlacklist').value = items.customBlacklist.join('\n');
+    }
 
     toggleRestApiVisibility();
   });
@@ -43,7 +49,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       attachmentFolder: document.getElementById('attachmentFolder').value.trim() || 'attachments',
       imageHandling: document.getElementById('imageHandling').value,
       includeFrontmatter: document.getElementById('includeFrontmatter').checked,
-      enableCallouts: document.getElementById('enableCallouts').checked
+      enableCallouts: document.getElementById('enableCallouts').checked,
+      enableCleaning: document.getElementById('enableCleaning').checked,
+      removeNoiseWords: document.getElementById('removeNoiseWords').checked,
+      removeRedundantBlankLines: document.getElementById('removeRedundantBlankLines').checked,
+      customBlacklist: document.getElementById('customBlacklist').value.split('\n').map(s => s.trim()).filter(Boolean)
     };
 
     chrome.storage.sync.set(newSettings, () => {

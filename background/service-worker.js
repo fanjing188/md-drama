@@ -13,7 +13,16 @@ const DEFAULT_SETTINGS = {
   autoScrollSpeed: 'normal', // 'fast' | 'normal' | 'thorough'
   includeFrontmatter: true,
   enableMathJax: true,
-  enableCallouts: true
+  enableCallouts: true,
+  enableCleaning: true,
+  removeNoiseWords: true,
+  removeRedundantBlankLines: true,
+  customBlacklist: [
+    "关注公众号",
+    "长按二维码",
+    "点击下方名片",
+    "一键三连"
+  ]
 };
 
 chrome.runtime.onInstalled.addListener(() => {
