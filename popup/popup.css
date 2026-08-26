@@ -17,10 +17,12 @@
 
   --accent-purple: #7C3AED;
   --accent-purple-glow: rgba(124, 58, 237, 0.25);
+  --accent-indigo: #6366F1;
   --accent-gold: #F59E0B;
   --accent-cyan: #06B6D4;
   
   --status-emerald: #10B981;
+  --status-emerald-glow: rgba(16, 185, 129, 0.25);
   --status-rose: #F43F5E;
 }
 
@@ -252,7 +254,7 @@ body {
   color: var(--text-bright);
 }
 
-/* 阶梯式流水线状态卡 */
+/* 阶梯式动态节点流水线卡片 (Live Pipeline Nodes) */
 .pipeline-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
@@ -260,7 +262,7 @@ body {
   padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .pipeline-header {
@@ -273,8 +275,8 @@ body {
   width: 6px;
   height: 6px;
   border-radius: 5px;
-  background-color: #6366F1;
-  box-shadow: 0 0 8px #6366F1;
+  background-color: var(--accent-indigo);
+  box-shadow: 0 0 8px var(--accent-indigo);
   animation: pulse-glow 1.5s infinite;
 }
 
@@ -308,20 +310,83 @@ body {
   height: 100%;
   width: 0%;
   background: linear-gradient(90deg, #6366F1, #8B5CF6);
-  transition: width 0.2s ease;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* 动态节点交互指示条 */
 .pipeline-stages {
   display: flex;
   justify-content: space-between;
-  font-size: 9.5px;
-  color: var(--text-faint);
-  margin-top: 2px;
+  align-items: center;
+  position: relative;
+  margin-top: 4px;
 }
 
-.stage-dot.active {
+.stage-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+  z-index: 2;
+  transition: all 0.2s ease;
+}
+
+.node-bullet {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: var(--bg-inset);
+  border: 1.5px solid var(--border-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  color: var(--text-faint);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.node-name {
+  font-size: 9.5px;
+  color: var(--text-faint);
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+/* 节点状态 1: 进行中 (Running) */
+.stage-node.running .node-bullet {
+  background-color: rgba(99, 102, 241, 0.2);
+  border-color: #818CF8;
+  color: #818CF8;
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.45);
+  animation: node-pulse 1.4s infinite ease-in-out;
+}
+
+.stage-node.running .node-name {
   color: #818CF8;
   font-weight: 600;
+}
+
+/* 节点状态 2: 已完成 (Completed) */
+.stage-node.completed .node-bullet {
+  background-color: var(--status-emerald);
+  border-color: var(--status-emerald);
+  color: #FFFFFF;
+  box-shadow: 0 0 6px var(--status-emerald-glow);
+}
+
+.stage-node.completed .node-name {
+  color: var(--status-emerald);
+}
+
+/* 节点状态 3: 跳过 (Skipped) */
+.stage-node.skipped {
+  opacity: 0.45;
+}
+
+@keyframes node-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 6px rgba(99, 102, 241, 0.3); }
+  50% { transform: scale(1.15); box-shadow: 0 0 12px rgba(99, 102, 241, 0.6); }
 }
 
 .cancel-link {
@@ -331,6 +396,11 @@ body {
   font-size: 11px;
   cursor: pointer;
   align-self: flex-end;
+  margin-top: 2px;
+}
+
+.cancel-link:hover {
+  text-decoration: underline;
 }
 
 /* 异常反馈条 */

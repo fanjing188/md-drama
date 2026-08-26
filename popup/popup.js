@@ -1,4 +1,4 @@
-// popup/popup.js - 极致流畅交互、灵感速记与批注、Obsidian 直连控制
+// popup/popup.js - 极致流畅交互、节点动态演进与灵感工作台
 
 let currentExtractData = null;
 let currentSettings = null;
@@ -20,7 +20,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnCopyMarkdown = document.getElementById('btnCopyMarkdown');
   const inputNewTag = document.getElementById('inputNewTag');
   const inputDocTitle = document.getElementById('inputDocTitle');
-  const inputAnnotation = document.getElementById('inputAnnotation');
 
   btnOptions.addEventListener('click', () => chrome.runtime.openOptionsPage());
   btnLogs.addEventListener('click', () => openLogsDrawer());
@@ -50,7 +49,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   btnSaveToObsidian.addEventListener('click', () => saveToObsidianStudio());
 
-  // 动态标签添加
   inputNewTag.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && inputNewTag.value.trim()) {
       e.preventDefault();
@@ -59,7 +57,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // 标题实时变更
   inputDocTitle.addEventListener('input', () => {
     if (currentExtractData) {
       currentExtractData.metadata.title = inputDocTitle.value.trim();
@@ -71,7 +68,7 @@ async function getSettings() {
   return new Promise(resolve => chrome.storage.sync.get(null, resolve));
 }
 
-// 初始化目标路径徽标
+// 目标归档路径指示
 async function initTargetRouteLabel() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const routeLabel = document.getElementById('routeLabel');
@@ -83,7 +80,40 @@ async function initTargetRouteLabel() {
   }
 }
 
-// 标签芯片渲染
+// 节点动态状态机驱动 (Stage Node State Machine)
+function setPipelineStage(stageIndex, statusText, percentVal) {
+  const pipelineFill = document.getElementById('pipelineFill');
+  const pipelinePercent = document.getElementById('pipelinePercent');
+  const pipelineStatusText = document.getElementById('pipelineStatusText');
+
+  if (percentVal !== undefined) {
+    pipelineFill.style.width = `${percentVal}%`;
+    pipelinePercent.innerText = `${percentVal}%`;
+  }
+  if (statusText) {
+    pipelineStatusText.innerText = statusText;
+  }
+
+  // 1-indexed stage update
+  for (let i = 1; i <= 5; i++) {
+    const node = document.getElementById(`stageNode${i}`);
+    if (!node) continue;
+    const bullet = node.querySelector('.node-bullet');
+
+    node.classList.remove('running', 'completed', 'skipped');
+
+    if (i < stageIndex) {
+      node.classList.add('completed');
+      bullet.innerHTML = '✓';
+    } else if (i === stageIndex) {
+      node.classList.add('running');
+      bullet.innerHTML = `${i}`;
+    } else {
+      bullet.innerHTML = `${i}`;
+    }
+  }
+}
+
 function renderTags(tags) {
   const container = document.getElementById('tagPillsContainer');
   container.innerHTML = '';
@@ -129,7 +159,7 @@ function clearError() {
   document.getElementById('errorAlert').classList.add('hidden');
 }
 
-// 执行核心剪藏工作流
+// 执行核心剪藏工作流与流水线动态演进
 async function runClipWorkflow(useAutoScroll) {
   clearError();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -139,9 +169,6 @@ async function runClipWorkflow(useAutoScroll) {
   }
 
   const pipeline = document.getElementById('pipelineContainer');
-  const pipelineFill = document.getElementById('pipelineFill');
-  const pipelinePercent = document.getElementById('pipelinePercent');
-  const pipelineStatusText = document.getElementById('pipelineStatusText');
   const studioPanel = document.getElementById('studioPanel');
 
   const enableScroll = document.getElementById('toggleAutoScroll').checked && useAutoScroll;
@@ -150,30 +177,38 @@ async function runClipWorkflow(useAutoScroll) {
 
   pipeline.classList.remove('hidden');
   studioPanel.classList.add('hidden');
-  pipelineFill.style.width = '10%';
-  pipelinePercent.innerText = '10%';
-  pipelineStatusText.innerText = enableScroll ? '正在自动平滑滚动加载...' : '正在启动 6 阶段通用排版流水线...';
+
+  // 阶段 1: 探测页面容器
+  setPipelineStage(1, '正在探测页面滚动容器与结构...', 10);
+  await new Promise(r => setTimeout(r, 200));
 
   // 监听滚动通知
   const scrollListener = (msg) => {
     if (msg.action === 'scrollProgress' && msg.progress) {
-      pipelineFill.style.width = `${msg.progress.percent}%`;
-      pipelinePercent.innerText = `${msg.progress.percent}%`;
-      pipelineStatusText.innerText = `深度滚动中 (${msg.progress.percent}%)`;
+      const scrollPct = Math.round(15 + (msg.progress.percent * 0.45)); // 15% ~ 60%
+      setPipelineStage(2, `深度滚动中 (${msg.progress.percent}%)`, scrollPct);
     }
   };
   chrome.runtime.onMessage.addListener(scrollListener);
 
   try {
     if (enableScroll) {
-      document.getElementById('stage2').classList.add('active');
+      // 阶段 2: 深度滚动
+      setPipelineStage(2, '正在自动平滑滚动加载...', 20);
       await chrome.tabs.sendMessage(tab.id, { action: 'startAutoScroll', interval: 150 });
+    } else {
+      // 若跳过滚动，标记第2阶段为完成并进入阶段3
+      const node2 = document.getElementById('stageNode2');
+      if (node2) node2.classList.add('skipped');
     }
 
-    document.getElementById('stage3').classList.add('active');
-    pipelineFill.style.width = '75%';
-    pipelinePercent.innerText = '75%';
-    pipelineStatusText.innerText = '正在语义重塑与排版去噪...';
+    // 阶段 3: DOM 复杂结构重塑 (Transformers)
+    setPipelineStage(3, '正在穿透 Shadow DOM 并重塑复杂结构...', 70);
+    await new Promise(r => setTimeout(r, 180));
+
+    // 阶段 4: 废话与广告智能去噪
+    setPipelineStage(4, '正在识别并剔除废话与营销套话...', 85);
+    await new Promise(r => setTimeout(r, 150));
 
     const mergedSettings = {
       ...currentSettings,
@@ -181,14 +216,17 @@ async function runClipWorkflow(useAutoScroll) {
       imageHandling: enableImages ? 'download' : 'external'
     };
 
+    // 阶段 5: 规范排版与 Markdown 序列化
+    setPipelineStage(5, '正在排版与 Markdown 序列化...', 95);
+
     const res = await chrome.tabs.sendMessage(tab.id, {
       action: 'extractMarkdown',
       settings: mergedSettings
     });
 
     if (res && res.success) {
-      document.getElementById('stage5').classList.add('active');
-      pipelineFill.style.width = '100%';
+      setPipelineStage(6, '全量解析完成！', 100);
+      await new Promise(r => setTimeout(r, 250));
       currentExtractData = res.data;
       showStudio(res.data);
     } else {
@@ -218,7 +256,6 @@ function showStudio(data) {
   renderTags(data.metadata.tags);
 }
 
-// 组装最终 Markdown (注入灵感批注与 Frontmatter)
 function assembleFinalMarkdown() {
   if (!currentExtractData) return '';
   const markdownCode = document.getElementById('markdownCode');
@@ -231,7 +268,6 @@ function assembleFinalMarkdown() {
   return bodyMd;
 }
 
-// 保存至 Obsidian Studio
 async function saveToObsidianStudio() {
   if (!currentExtractData) return;
   const btnSave = document.getElementById('btnSaveToObsidian');
@@ -245,7 +281,6 @@ async function saveToObsidianStudio() {
 
   try {
     if (currentSettings.obsidianSyncMethod === 'rest_api') {
-      // 1. 保存图片附件
       if (currentExtractData.images?.length > 0) {
         for (const img of currentExtractData.images) {
           try {
@@ -269,7 +304,6 @@ async function saveToObsidianStudio() {
         }
       }
 
-      // 2. 保存 Markdown
       await chrome.runtime.sendMessage({
         action: 'saveToObsidianRestApi',
         data: {

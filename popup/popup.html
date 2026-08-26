@@ -69,7 +69,7 @@
       </button>
     </div>
 
-    <!-- 动态流水线指示器 (Stepped Pipeline) -->
+    <!-- 动态节点流水线指示器 (Stepped Pipeline with Live Node Badges) -->
     <div id="pipelineContainer" class="pipeline-card hidden">
       <div class="pipeline-header">
         <div class="pulse-indicator"></div>
@@ -79,13 +79,31 @@
       <div class="pipeline-track">
         <div id="pipelineFill" class="pipeline-bar"></div>
       </div>
+      
+      <!-- 5个具有状态演进的节点指示器 -->
       <div class="pipeline-stages">
-        <span class="stage-dot active" id="stage1">探测</span>
-        <span class="stage-dot" id="stage2">滚动</span>
-        <span class="stage-dot" id="stage3">重塑</span>
-        <span class="stage-dot" id="stage4">去噪</span>
-        <span class="stage-dot" id="stage5">排版</span>
+        <div class="stage-node running" id="stageNode1">
+          <div class="node-bullet">1</div>
+          <span class="node-name">探测</span>
+        </div>
+        <div class="stage-node" id="stageNode2">
+          <div class="node-bullet">2</div>
+          <span class="node-name">滚动</span>
+        </div>
+        <div class="stage-node" id="stageNode3">
+          <div class="node-bullet">3</div>
+          <span class="node-name">重塑</span>
+        </div>
+        <div class="stage-node" id="stageNode4">
+          <div class="node-bullet">4</div>
+          <span class="node-name">去噪</span>
+        </div>
+        <div class="stage-node" id="stageNode5">
+          <div class="node-bullet">5</div>
+          <span class="node-name">排版</span>
+        </div>
       </div>
+      
       <button id="btnCancelScroll" class="cancel-link">停止滚动并转换现有内容</button>
     </div>
 
