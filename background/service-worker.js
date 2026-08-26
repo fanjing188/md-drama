@@ -165,7 +165,7 @@ async function saveToObsidianBackend(extractData, url, settings) {
   const fullPath = `${targetFolder}/${filename}`.replace(/\/+/g, '/');
 
   if (settings.obsidianSyncMethod === 'rest_api') {
-    // 保存图片
+    // 1. 静默并发下载所有图片并保存至 Obsidian 附件目录
     if (settings.imageHandling === 'download' && extractData.images?.length > 0) {
       for (const img of extractData.images) {
         try {
@@ -178,12 +178,12 @@ async function saveToObsidianBackend(extractData, url, settings) {
             settings: settings
           });
         } catch (e) {
-          console.warn('图片附件保存跳过:', img.filename);
+          console.warn('图片附件保存跳过:', img.filename, e);
         }
       }
     }
 
-    // 保存 Markdown
+    // 2. 保存 Markdown 文件
     return await saveToObsidianRestApi({
       path: fullPath,
       content: extractData.markdown,
@@ -191,7 +191,23 @@ async function saveToObsidianBackend(extractData, url, settings) {
       settings: settings
     });
   } else {
-    // 导出文件
+    // 导出文件模式：同时下载 Markdown 和图片包
+    if (settings.imageHandling === 'download' && extractData.images?.length > 0) {
+      for (const img of extractData.images) {
+        try {
+          const imgPath = `Obsidian_Vault/${targetFolder}/${settings.attachmentFolder || 'attachments'}/${img.filename}`.replace(/\/+/g, '/');
+          const imgBase64 = await fetchImageAsBase64(img.originalUrl);
+          await handleDownload({
+            filename: imgPath,
+            content: imgBase64,
+            isDataUrl: true
+          });
+        } catch (e) {
+          console.warn('本地图片下载失败:', img.filename);
+        }
+      }
+    }
+
     return await handleDownload({
       filename: `Obsidian_Vault/${fullPath}`,
       content: extractData.markdown
@@ -199,7 +215,21 @@ async function saveToObsidianBackend(extractData, url, settings) {
   }
 }
 
-async function handleDownload({ filename, content, mimeType = 'text/markdown;charset=utf-8' }) {
+async function handleDownload({ filename, content, mimeType = 'text/markdown;charset=utf-8', isDataUrl = false }) {
+  if (isDataUrl) {
+    return new Promise((resolve, reject) => {
+      chrome.downloads.download({
+        url: content,
+        filename: filename,
+        saveAs: false,
+        conflictAction: 'uniquify'
+      }, (downloadId) => {
+        if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+        else resolve({ downloadId });
+      });
+    });
+  }
+
   const blob = new Blob([content], { type: mimeType });
   const reader = new FileReader();
 

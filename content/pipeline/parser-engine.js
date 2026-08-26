@@ -41,12 +41,17 @@ class UniversalParserEngine {
       }
     });
 
-    // Obsidian Callout 规则
-    service.addRule('callouts', {
-      filter: (node) => node.nodeName === 'BLOCKQUOTE' && node.innerHTML.includes('[!NOTE]'),
-      replacement: (content) => {
-        const lines = content.trim().split('\n');
-        return '\n\n' + lines.map(line => `> ${line}`).join('\n') + '\n\n';
+    // 处理图片：支持标准 Markdown 与 Obsidian 双链语法，并在前后添加独立段落换行
+    service.addRule('images', {
+      filter: 'img',
+      replacement: (content, node) => {
+        const alt = node.getAttribute('alt') || '';
+        const src = node.getAttribute('src') || '';
+        if (!src) return '';
+        if (node.getAttribute('data-obsidian-wiki') === 'true') {
+          return `\n\n![[${src}]]\n\n`;
+        }
+        return `\n\n![${alt}](${src})\n\n`;
       }
     });
 
@@ -115,7 +120,9 @@ class UniversalParserEngine {
       });
 
       if (this.options.imageMode === 'download') {
-        img.setAttribute('src', `${this.options.attachmentFolder}/${cleanFilename}`);
+        const attFolder = this.options.attachmentFolder || 'attachments';
+        // 使用相对路径精确定位 Obsidian 附件
+        img.setAttribute('src', `${attFolder}/${cleanFilename}`);
       } else {
         img.setAttribute('src', src);
       }
