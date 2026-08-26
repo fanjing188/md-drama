@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>md抓马 (MD-Drama)</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <div class="logo-title">
+      <span class="logo-badge">MD</span>
+      <h2>md抓马</h2>
+    </div>
+    <button id="btnOptions" class="icon-btn" title="偏好设置">⚙️</button>
+  </div>
+
+  <div class="action-panel">
+    <button id="btnSmartCrawl" class="btn btn-primary">
+      <span class="icon">🚀</span> 深度滚动抓取 (懒加载适配)
+    </button>
+    <button id="btnDirectExtract" class="btn btn-secondary">
+      <span class="icon">⚡</span> 直接快速提取当前页面
+    </button>
+  </div>
+
+  <div id="statusSection" class="status-section hidden">
+    <div class="progress-bar-container">
+      <div id="progressBar" class="progress-bar"></div>
+    </div>
+    <div id="statusText" class="status-text">准备中...</div>
+    <button id="btnCancel" class="btn-text">停止滚动并立即提取</button>
+  </div>
+
+  <div id="resultSection" class="result-section hidden">
+    <div class="result-header">
+      <h3 id="docTitle">标题</h3>
+      <span id="imgCountBadge" class="badge">0 图</span>
+    </div>
+    <textarea id="markdownPreview" readonly></textarea>
+    <div class="result-actions">
+      <button id="btnSaveObsidian" class="btn btn-accent">📥 保存至 Obsidian</button>
+      <button id="btnCopyMd" class="btn btn-secondary">📋 复制 Markdown</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

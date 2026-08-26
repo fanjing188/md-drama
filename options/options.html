@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>md抓马 (MD-Drama) - 设置</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>md抓马 (MD-Drama) 偏好设置</h2>
+      <p class="subtitle">配置 Obsidian 同步方式、剪藏路径与排版规则</p>
+    </div>
+
+    <form id="settingsForm">
+      <div class="card">
+        <h3>Obsidian 同步设置</h3>
+        
+        <div class="form-group">
+          <label for="obsidianSyncMethod">同步模式</label>
+          <select id="obsidianSyncMethod">
+            <option value="downloads">直接导出 / 下载到目录 (默认)</option>
+            <option value="rest_api">Obsidian Local REST API (推荐，秒级后台静默写入)</option>
+          </select>
+          <div class="hint">使用 REST API 需要在 Obsidian 安装 Local REST API 社区插件并启用。</div>
+        </div>
+
+        <div id="restApiConfig" class="form-group">
+          <label for="restApiPort">REST API 端口</label>
+          <input type="number" id="restApiPort" value="27124" placeholder="27124">
+          
+          <label for="restApiToken" style="margin-top: 10px;">API Token</label>
+          <input type="password" id="restApiToken" placeholder="在 Obsidian 插件设置中获取的 API Key">
+
+          <label style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="restApiHttps" checked> 启用 HTTPS (默认启用)
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label for="vaultSavePath">默认保存相对路径</label>
+          <input type="text" id="vaultSavePath" value="03-知识库/网页剪藏" placeholder="例如：03-知识库/网页剪藏">
+          <div class="hint">相对于 Obsidian 库根目录的存放文件夹。</div>
+        </div>
+
+        <div class="form-group">
+          <label for="attachmentFolder">图片附件子目录</label>
+          <input type="text" id="attachmentFolder" value="attachments" placeholder="attachments">
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>排版与媒体规则</h3>
+
+        <div class="form-group">
+          <label for="imageHandling">图片保存策略</label>
+          <select id="imageHandling">
+            <option value="download">本地化下载至 Obsidian 附件目录 (推荐)</option>
+            <option value="external">保留原始外链</option>
+            <option value="base64">内联 Base64 数据</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="includeFrontmatter" checked> 自动注入 YAML Frontmatter (标题/来源/日期/标签)
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="enableCallouts" checked> 兼容 Obsidian Callout 语法 (&gt; [!NOTE])
+          </label>
+        </div>
+      </div>
+
+      <div class="footer">
+        <button type="submit" id="btnSave" class="btn btn-primary">保存设置</button>
+        <span id="saveStatus" class="status-msg"></span>
+      </div>
+    </form>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
