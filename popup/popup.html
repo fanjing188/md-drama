@@ -6,121 +6,158 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="app-container">
-    <!-- 顶部导航栏 -->
-    <header class="navbar">
-      <div class="brand">
-        <div class="brand-mark">MD</div>
-        <div class="brand-text">
-          <span class="brand-name">md抓马</span>
-          <span class="brand-tag">Studio</span>
+  <div class="drama-shell">
+    
+    <!-- 顶部状态栏 -->
+    <header class="app-header">
+      <div class="brand-cluster">
+        <div class="brand-glyph">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+        </div>
+        <div class="brand-meta">
+          <span class="brand-title">md抓马</span>
+          <span class="version-pill">v1.1.0</span>
         </div>
       </div>
-      <div class="nav-actions">
-        <button id="btnLogs" class="nav-btn" title="查看运行日志">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+
+      <div class="header-tools">
+        <div id="targetFolderBadge" class="vault-route" title="目标归档路径">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+          <span id="routeLabel">网页剪藏</span>
+        </div>
+        <button id="btnLogs" class="icon-tool" title="运行日志">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
         </button>
-        <button id="btnOptions" class="nav-btn" title="偏好设置">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <button id="btnOptions" class="icon-tool" title="偏好设置">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
         </button>
       </div>
     </header>
 
-    <!-- 优雅 Toast 提示 -->
-    <div id="toast" class="toast hidden">
-      <div class="toast-icon"></div>
-      <div id="toastMessage" class="toast-content"></div>
+    <!-- 快捷功能微调胶囊条 -->
+    <div class="control-capsules">
+      <label class="capsule-toggle" title="自动模拟平滑滚动，加载懒加载与虚拟滚动内容">
+        <input type="checkbox" id="toggleAutoScroll" checked>
+        <span class="capsule-pill">深度滚动</span>
+      </label>
+      <label class="capsule-toggle" title="智能过滤广告、营销号套话、引流求关注等废话">
+        <input type="checkbox" id="toggleCleaner" checked>
+        <span class="capsule-pill">废话去噪</span>
+      </label>
+      <label class="capsule-toggle" title="完整下载图片资源至 Obsidian 附件目录">
+        <input type="checkbox" id="toggleDownloadImages" checked>
+        <span class="capsule-pill">转存图片</span>
+      </label>
     </div>
 
-    <!-- 主操作区 -->
-    <main class="main-body">
-      <div class="action-grid">
-        <button id="btnSmartCrawl" class="action-card primary">
-          <div class="card-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+    <!-- 核心操作区 (Hero Actions) -->
+    <div class="action-dock">
+      <button id="btnPrimaryCrawl" class="hero-cta">
+        <div class="cta-shine"></div>
+        <div class="cta-inner">
+          <div class="cta-main">
+            <svg class="cta-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            <span class="cta-text">一键智能剪藏</span>
           </div>
-          <div class="card-info">
-            <div class="card-title">深度滚动抓取</div>
-            <div class="card-desc">自动探测平滑滚动加载，适配飞书/动态流</div>
-          </div>
-        </button>
+          <span class="cta-shortcut">Alt+Shift+S</span>
+        </div>
+      </button>
 
-        <button id="btnDirectExtract" class="action-card secondary">
-          <div class="card-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-          </div>
-          <div class="card-info">
-            <div class="card-title">即时解析页面</div>
-            <div class="card-desc">6 阶段通用排版流水线，过滤废话</div>
-          </div>
-        </button>
+      <button id="btnQuickExtract" class="secondary-btn" title="不触发滚动，直接解析当前已渲染正文">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+        <span>即时解析视口</span>
+      </button>
+    </div>
+
+    <!-- 动态流水线指示器 (Stepped Pipeline) -->
+    <div id="pipelineContainer" class="pipeline-card hidden">
+      <div class="pipeline-header">
+        <div class="pulse-indicator"></div>
+        <span id="pipelineStatusText" class="pipeline-label">正在探测页面容器...</span>
+        <span id="pipelinePercent" class="pipeline-num">0%</span>
+      </div>
+      <div class="pipeline-track">
+        <div id="pipelineFill" class="pipeline-bar"></div>
+      </div>
+      <div class="pipeline-stages">
+        <span class="stage-dot active" id="stage1">探测</span>
+        <span class="stage-dot" id="stage2">滚动</span>
+        <span class="stage-dot" id="stage3">重塑</span>
+        <span class="stage-dot" id="stage4">去噪</span>
+        <span class="stage-dot" id="stage5">排版</span>
+      </div>
+      <button id="btnCancelScroll" class="cancel-link">停止滚动并转换现有内容</button>
+    </div>
+
+    <!-- 异常状态反馈 -->
+    <div id="errorAlert" class="error-strip hidden">
+      <div class="error-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+      </div>
+      <div id="errorMessage" class="error-text"></div>
+    </div>
+
+    <!-- 结果与批注工作台 (Result Studio) -->
+    <div id="studioPanel" class="studio-card hidden">
+      <div class="doc-header-row">
+        <input type="text" id="inputDocTitle" class="doc-title-input" placeholder="文档标题...">
+        <div class="meta-pills">
+          <span id="badgeWordCount" class="meta-pill">0 字</span>
+          <span id="badgeImgCount" class="meta-pill">0 图</span>
+        </div>
       </div>
 
-      <!-- 进度指示器 -->
-      <section id="statusSection" class="status-card hidden">
-        <div class="status-top">
-          <span id="statusText" class="status-label">正在初始化引擎...</span>
-          <span id="statusPercent" class="status-val">0%</span>
-        </div>
-        <div class="progress-track">
-          <div id="progressBar" class="progress-fill"></div>
-        </div>
-        <div class="status-footer">
-          <button id="btnCancel" class="btn-cancel">停止滚动并解析已加载内容</button>
-        </div>
-      </section>
+      <!-- 灵感速记与批注条 -->
+      <div class="annotation-row">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+        <input type="text" id="inputAnnotation" class="annotation-input" placeholder="添加速记批注 (将高亮置于文首，可选)...">
+      </div>
 
-      <!-- 优雅报错卡片 -->
-      <section id="errorCard" class="error-banner hidden">
-        <div class="error-header">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-          <span class="error-title">执行异常</span>
-        </div>
-        <div id="errorDetails" class="error-msg">未知错误</div>
-      </section>
+      <!-- 标签输入条 -->
+      <div class="tags-row">
+        <div id="tagPillsContainer" class="tag-chips"></div>
+        <input type="text" id="inputNewTag" class="tag-add-input" placeholder="+ 标签">
+      </div>
 
-      <!-- 转换结果展示 -->
-      <section id="resultSection" class="result-box hidden">
-        <div class="result-meta">
-          <div class="meta-left">
-            <h4 id="docTitle" class="doc-heading">文档标题</h4>
-            <div class="meta-tags">
-              <span id="statChars" class="tag">0 字</span>
-              <span id="statImages" class="tag">0 图</span>
-            </div>
-          </div>
-        </div>
+      <!-- Markdown 编辑与预览 -->
+      <div class="code-viewport">
+        <textarea id="markdownCode" class="md-editor" spellcheck="false"></textarea>
+      </div>
 
-        <div class="preview-wrapper">
-          <textarea id="markdownPreview" class="code-preview" readonly spellcheck="false"></textarea>
-        </div>
+      <!-- 底部动作条 -->
+      <div class="studio-dock">
+        <button id="btnSaveToObsidian" class="btn-vault">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>同步至 Obsidian</span>
+        </button>
+        <button id="btnCopyMarkdown" class="btn-hollow" title="复制到剪贴板">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          <span>复制 MD</span>
+        </button>
+      </div>
+    </div>
 
-        <div class="button-group">
-          <button id="btnSaveObsidian" class="btn btn-obsidian">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            保存至 Obsidian
-          </button>
-          <button id="btnCopyMd" class="btn btn-ghost">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            复制 Markdown
-          </button>
-        </div>
-      </section>
+    <!-- 浮动通知 Toast -->
+    <div id="toastFlyout" class="toast-flyout hidden">
+      <span id="toastIcon" class="toast-glyph">✓</span>
+      <span id="toastText" class="toast-body">已完成</span>
+    </div>
 
-      <!-- 日志抽屉模态 -->
-      <div id="logsModal" class="modal hidden">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3>运行跟踪日志</h3>
-            <div class="modal-actions">
-              <button id="btnClearLogs" class="btn-sm">清空</button>
-              <button id="btnCloseLogs" class="btn-close">&times;</button>
-            </div>
-          </div>
-          <div id="logsContainer" class="logs-stream"></div>
+    <!-- 日志抽屉模态 -->
+    <div id="logsDrawer" class="logs-drawer hidden">
+      <div class="drawer-header">
+        <div class="drawer-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          <span>实时运行日志</span>
+        </div>
+        <div class="drawer-tools">
+          <button id="btnClearLogs" class="tool-btn">清空</button>
+          <button id="btnCloseLogs" class="tool-btn close">&times;</button>
         </div>
       </div>
-    </main>
+      <div id="logsStream" class="drawer-body"></div>
+    </div>
+
   </div>
 
   <script src="../utils/logger.js"></script>
