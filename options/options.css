@@ -1,54 +1,78 @@
+/* options/options.css - 极简北欧工业风与深石板高级设计 (Slate & Obsidian Theme) */
+
+:root {
+  --bg-app: #0F1115;
+  --bg-card: #181B20;
+  --bg-input: #121418;
+  --border-subtle: #262B33;
+  --border-focus: #3E4552;
+  
+  --text-primary: #F3F4F6;
+  --text-secondary: #9CA3AF;
+  --text-muted: #64748B;
+  
+  --accent-main: #6366F1;
+  --accent-hover: #4F46E5;
+  --accent-obsidian: #8B5CF6;
+  
+  --status-success: #10B981;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background-color: #F3F4F6;
-  color: #1F2937;
-  padding: 32px;
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  padding: 40px 20px;
   display: flex;
   justify-content: center;
+  font-size: 13.5px;
+  -webkit-font-smoothing: antialiased;
 }
 
 .container {
-  max-width: 640px;
+  max-width: 680px;
   width: 100%;
 }
 
 .header {
   margin-bottom: 24px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 16px;
 }
 
 .header h2 {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
 }
 
 .subtitle {
-  font-size: 14px;
-  color: #6B7280;
+  font-size: 13px;
+  color: var(--text-secondary);
   margin-top: 4px;
 }
 
 .card {
-  background-color: #FFFFFF;
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 20px;
-  border: 1px solid #E5E7EB;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  background-color: var(--bg-card);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 18px;
+  border: 1px solid var(--border-subtle);
 }
 
 .card h3 {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   margin-bottom: 16px;
-  color: #374151;
-  border-bottom: 1px solid #F3F4F6;
+  color: #E2E8F0;
+  border-bottom: 1px solid var(--border-subtle);
   padding-bottom: 8px;
 }
 
@@ -62,34 +86,38 @@ body {
 
 label {
   display: block;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   margin-bottom: 6px;
-  color: #374151;
+  color: #D1D5DB;
 }
 
 input[type="text"],
 input[type="number"],
 input[type="password"],
+textarea,
 select {
   width: 100%;
-  padding: 10px 12px;
+  padding: 9px 12px;
   border-radius: 6px;
-  border: 1px solid #D1D5DB;
-  font-size: 14px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13px;
   outline: none;
   transition: border-color 0.2s;
 }
 
 input:focus,
+textarea:focus,
 select:focus {
-  border-color: #4F46E5;
+  border-color: var(--accent-main);
 }
 
 .hint {
-  font-size: 12px;
-  color: #9CA3AF;
-  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 5px;
 }
 
 .footer {
@@ -100,9 +128,9 @@ select:focus {
 }
 
 .btn {
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-size: 14px;
+  padding: 9px 20px;
+  border-radius: 6px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   border: none;
@@ -110,15 +138,15 @@ select:focus {
 }
 
 .btn-primary {
-  background-color: #4F46E5;
+  background-color: var(--accent-obsidian);
   color: #FFFFFF;
 }
 
 .btn-primary:hover {
-  background-color: #4338CA;
+  background-color: #7C3AED;
 }
 
 .status-msg {
-  font-size: 14px;
-  color: #059669;
+  font-size: 13px;
+  color: var(--status-success);
 }
