@@ -41,6 +41,11 @@ body {
   font-size: 12px;
   overflow: hidden;
   user-select: none;
+  transition: height 0.2s ease, width 0.2s ease;
+}
+
+body.history-expanded {
+  height: 520px;
 }
 
 .drama-shell {
@@ -108,63 +113,33 @@ body {
 .header-tools {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
-.vault-route {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--pixel-bg-card);
-  border: 1.5px solid var(--pixel-border);
-  box-shadow: 1.5px 1.5px 0 var(--pixel-border);
-  padding: 3px 7px;
-  border-radius: 4px;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--pixel-text);
-}
-
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: #9CA3AF;
-}
-
-.status-dot.green {
-  background-color: #10B981;
-}
-
-.icon-tool {
+/* 右上角纯文字像素按钮 */
+.text-tool-btn {
   background: var(--pixel-bg-card);
   border: 1.5px solid var(--pixel-border);
   box-shadow: 1.5px 1.5px 0 var(--pixel-border);
   color: var(--pixel-text);
-  width: 27px;
-  height: 27px;
+  padding: 3px 8px;
   border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
   cursor: pointer;
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  letter-spacing: 0.5px;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.1s ease;
 }
 
-.icon-tool:hover {
+.text-tool-btn:hover {
   background: var(--pixel-yellow);
   transform: translate(-1px, -1px);
   box-shadow: 2.5px 2.5px 0 var(--pixel-border);
 }
 
-.icon-tool:active {
+.text-tool-btn:active {
   transform: translate(1.5px, 1.5px);
   box-shadow: 0 0 0 var(--pixel-border);
-}
-
-.tool-emoji {
-  font-size: 13px;
-  line-height: 1;
 }
 
 /* 2. 当前页面基础信息卡片 */
@@ -218,7 +193,7 @@ body {
   word-break: break-word;
 }
 
-/* 3. 核心操作区 (只保留一个主抓取按钮：抓下来) */
+/* 3. 核心操作区 */
 .action-dock {
   display: flex;
   flex-direction: column;
@@ -693,9 +668,9 @@ body {
   font-weight: 900;
 }
 
-/* 8. 历史记录抽屉 (History Drawer) */
+/* 8. 历史记录抽屉 (History Drawer - 可容纳10+条记录向下滑动) */
 .logs-drawer {
-  position: absolute;
+  position: fixed;
   inset: 0;
   background: var(--pixel-bg-canvas);
   z-index: 1200;
@@ -703,6 +678,9 @@ body {
   flex-direction: column;
   padding: 12px;
   gap: 8px;
+  height: 520px;
+  max-height: 520px;
+  box-sizing: border-box;
 }
 
 .drawer-header {
@@ -750,32 +728,49 @@ body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding-right: 2px;
+  gap: 6px;
+  padding-right: 4px;
+  max-height: 460px;
+}
+
+/* 自定义像素滚动条 */
+.drawer-body.history-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.drawer-body.history-list::-webkit-scrollbar-track {
+  background: var(--pixel-bg-subtle);
+  border-radius: 3px;
+}
+
+.drawer-body.history-list::-webkit-scrollbar-thumb {
+  background: var(--pixel-border);
+  border-radius: 3px;
 }
 
 .history-card {
   background: var(--pixel-bg-card);
-  border: 2px solid var(--pixel-border);
-  box-shadow: 2px 2px 0 var(--pixel-border);
+  border: 1.5px solid var(--pixel-border);
+  box-shadow: 1.5px 1.5px 0 var(--pixel-border);
   border-radius: 4px;
-  padding: 8px;
+  padding: 7px 9px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
+  flex-shrink: 0;
 }
 
 .history-meta-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 9.5px;
 }
 
 .history-badge {
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 800;
-  padding: 1px 5px;
+  padding: 1px 4px;
   border-radius: 2px;
   border: 1px solid var(--pixel-border);
 }
@@ -793,26 +788,33 @@ body {
 .history-time {
   color: var(--pixel-text-sub);
   font-weight: 600;
+  font-size: 9.5px;
 }
 
 .history-title {
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--pixel-text);
   line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
 }
 
 .history-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 2px;
-  padding-top: 4px;
+  margin-top: 1px;
+  padding-top: 3px;
   border-top: 1px dashed var(--pixel-border-light);
 }
 
 .history-link {
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
   color: #2563EB;
   text-decoration: none;
@@ -831,6 +833,7 @@ body {
   cursor: pointer;
   color: var(--pixel-text-muted);
   font-size: 11px;
+  padding: 0 2px;
 }
 
 .history-del-btn:hover {
@@ -839,7 +842,7 @@ body {
 
 .history-empty {
   text-align: center;
-  padding: 30px 10px;
+  padding: 40px 10px;
   color: var(--pixel-text-sub);
   font-weight: 700;
   font-size: 12px;

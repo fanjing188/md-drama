@@ -8,7 +8,6 @@ const logger = new DramaLogger('PopupPixel');
 document.addEventListener('DOMContentLoaded', async () => {
   currentSettings = await getSettings();
   await initCurrentPageInfo();
-  initObsidianConnectionDot();
 
   // 绑定核心交互事件
   const btnPrimaryCrawl = document.getElementById('btnPrimaryCrawl');
@@ -124,62 +123,30 @@ async function initCurrentPageInfo() {
   } catch (e) {}
 
   let siteLabel = '🌐 网页';
-  let routeFolder = '网页剪藏';
 
   if (url.includes('feishu.cn') || url.includes('larksuite.com')) {
     siteLabel = '👾 飞书文档';
-    routeFolder = '工作文档';
   } else if (url.includes('shengcaiyoushu.com') || url.includes('zsxq.com')) {
     siteLabel = '💰 商业社群';
-    routeFolder = '商业社群';
   } else if (url.includes('weixin.qq.com')) {
     siteLabel = '💬 微信公众号';
-    routeFolder = '公众号精选';
   } else if (url.includes('zhihu.com')) {
     siteLabel = '💡 知乎专栏/问答';
-    routeFolder = '知乎精选';
   } else if (url.includes('yuque.com')) {
     siteLabel = '📚 语雀知识库';
-    routeFolder = '语雀知识库';
   } else if (url.includes('juejin.cn')) {
     siteLabel = '💎 掘金技术';
-    routeFolder = '掘金技术';
   } else if (url.includes('notion.site') || url.includes('notion.so')) {
     siteLabel = '📝 Notion';
-    routeFolder = 'Notion';
   }
 
   const siteTagEl = document.getElementById('pageSiteTag');
   const pageHostEl = document.getElementById('pageHost');
   const pageTitleEl = document.getElementById('pageTitlePreview');
-  const routeLabelEl = document.getElementById('routeLabel');
 
   if (siteTagEl) siteTagEl.innerText = siteLabel;
   if (pageHostEl) pageHostEl.innerText = host;
   if (pageTitleEl) pageTitleEl.innerText = title;
-  if (routeLabelEl) routeLabelEl.innerText = routeFolder;
-}
-
-// 探测 Obsidian Local REST API 连通性
-async function initObsidianConnectionDot() {
-  const dot = document.getElementById('obsidianStatusDot');
-  if (!dot) return;
-
-  if (currentSettings.obsidianSyncMethod !== 'rest_api') {
-    dot.className = 'status-dot';
-    dot.title = '当前为本地导出模式';
-    return;
-  }
-
-  chrome.runtime.sendMessage({ action: 'checkObsidianConnection' }, (res) => {
-    if (res && res.connected) {
-      dot.className = 'status-dot green';
-      dot.title = 'Obsidian Local REST API 在线';
-    } else {
-      dot.className = 'status-dot';
-      dot.title = '未检测到 Obsidian 连接';
-    }
-  });
 }
 
 // 标签芯片渲染与增删
@@ -308,7 +275,7 @@ async function ensureContentScripts(tabId) {
   } catch (e) {}
 }
 
-// 执行核心剪藏工作流
+// 执行核心剪藏工作流 (点击抓下来后：隐藏原操作区，展示抓取进度板块)
 async function runClipWorkflow(useAutoScroll) {
   clearError();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -319,9 +286,14 @@ async function runClipWorkflow(useAutoScroll) {
 
   await ensureContentScripts(tab.id);
 
+  const pageInfoCard = document.getElementById('pageInfoCard');
+  const actionDock = document.getElementById('actionDock');
   const pipeline = document.getElementById('pipelineContainer');
   const studioPanel = document.getElementById('studioPanel');
 
+  // 1. 隐藏原操作区与页面信息卡片，展示抓取进度板块
+  pageInfoCard.classList.add('hidden');
+  actionDock.classList.add('hidden');
   pipeline.classList.remove('hidden');
   studioPanel.classList.add('hidden');
 
@@ -332,7 +304,7 @@ async function runClipWorkflow(useAutoScroll) {
   // 监听滚动通知
   const scrollListener = (msg) => {
     if (msg.action === 'scrollProgress' && msg.progress) {
-      const scrollPct = Math.round(15 + (msg.progress.percent * 0.45)); // 15% ~ 60%
+      const scrollPct = Math.round(15 + (msg.progress.percent * 0.45));
       setPipelineStage(2, `深度滚动收割中 (${msg.progress.percent}%)`, scrollPct);
     }
   };
@@ -343,9 +315,6 @@ async function runClipWorkflow(useAutoScroll) {
       // 阶段 2: 深度滚动收割
       setPipelineStage(2, '正在平滑滚动收割全部内容与图片...', 20);
       await chrome.tabs.sendMessage(tab.id, { action: 'startAutoScroll', interval: 140 });
-    } else {
-      const node2 = document.getElementById('stageNode2');
-      if (node2) node2.classList.add('skipped');
     }
 
     // 阶段 3: DOM 复杂结构重塑 (Transformers)
@@ -367,6 +336,7 @@ async function runClipWorkflow(useAutoScroll) {
     if (res && res.success) {
       setPipelineStage(6, '全量抓取完成！', 100);
       await new Promise(r => setTimeout(r, 200));
+      pipeline.classList.add('hidden');
       currentExtractData = res.data;
       showStudio(res.data);
     } else {
@@ -375,8 +345,11 @@ async function runClipWorkflow(useAutoScroll) {
   } catch (err) {
     logger.error('抓取发生错误', err.message);
     displayError(`抓取遇到问题: ${err.message}`);
-  } finally {
+    // 发生错误时，恢复显示操作区供用户重试
     pipeline.classList.add('hidden');
+    pageInfoCard.classList.remove('hidden');
+    actionDock.classList.remove('hidden');
+  } finally {
     chrome.runtime.onMessage.removeListener(scrollListener);
   }
 }
@@ -442,13 +415,15 @@ async function saveToObsidianStudio() {
   }
 }
 
-// 历史记录抽屉
+// 历史记录抽屉 (展开弹窗并支持展示10+条记录向下滑动)
 async function openHistoryDrawer() {
+  document.body.classList.add('history-expanded');
   document.getElementById('historyDrawer').classList.remove('hidden');
   await renderHistoryList();
 }
 
 function closeHistoryDrawer() {
+  document.body.classList.remove('history-expanded');
   document.getElementById('historyDrawer').classList.add('hidden');
 }
 
@@ -481,7 +456,7 @@ async function renderHistoryList() {
           </div>
           <span class="history-time">${item.timeStr || ''}</span>
         </div>
-        <div class="history-title">${escapeHtml(item.title)}</div>
+        <div class="history-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
         <div class="history-footer">
           ${item.url ? `<a href="${item.url}" target="_blank" class="history-link" title="在浏览器中打开原网页">🌐 点击直达原网页 &rarr;</a>` : '<span></span>'}
           <button class="history-del-btn" data-id="${item.id}" title="删除此条记录">🗑️</button>

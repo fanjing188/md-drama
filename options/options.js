@@ -1,4 +1,4 @@
-// options/options.js - md抓吗 偏好设置管理
+// options/options.js - md抓吗 偏好设置管理 (Tab 切换与独立配置)
 
 document.addEventListener('DOMContentLoaded', async () => {
   const form = document.getElementById('settingsForm');
@@ -8,9 +8,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   const appendPathConfig = document.getElementById('appendPathConfig');
   const saveStatus = document.getElementById('saveStatus');
 
-  // 读取已保存的设置
+  // 1. Tab 切换逻辑 (点击对应 Tab 只展示对应的内容板块)
+  const tabButtons = document.querySelectorAll('.tab-item');
+  const tabPanels = document.querySelectorAll('.tab-panel');
+
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetPanelId = btn.getAttribute('data-tab');
+
+      tabButtons.forEach(b => b.classList.remove('active'));
+      tabPanels.forEach(p => {
+        p.classList.remove('active');
+        p.classList.add('hidden');
+      });
+
+      btn.classList.add('active');
+      const targetPanel = document.getElementById(targetPanelId);
+      if (targetPanel) {
+        targetPanel.classList.remove('hidden');
+        targetPanel.classList.add('active');
+      }
+    });
+  });
+
+  // 2. 读取已保存的配置
   chrome.storage.sync.get(null, (items) => {
-    // 划选相关设置
+    // 页面划选相关设置
     if (items.enableSelectionBubble !== undefined) {
       document.getElementById('enableSelectionBubble').checked = items.enableSelectionBubble;
     }
@@ -61,6 +84,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // 3. 表单保存提交
   form.addEventListener('submit', (e) => {
     e.preventDefault();
 

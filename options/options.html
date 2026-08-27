@@ -8,196 +8,217 @@
 <body>
   <div class="settings-shell">
     
-    <!-- 侧边栏 -->
-    <aside class="sidebar">
-      <div class="brand-box">
-        <div class="brand-glyph">
-          <img src="../icons/icon48.png" width="24" height="24" alt="md抓吗" style="display:block; border-radius:3px;">
+    <!-- 顶部固定冻结菜单栏 (Sticky Header) -->
+    <header class="sticky-header">
+      <div class="header-top">
+        <div class="brand-cluster">
+          <div class="brand-glyph">
+            <img src="../icons/icon48.png" width="24" height="24" alt="md抓吗" style="display:block; border-radius:3px;">
+          </div>
+          <div class="brand-title">
+            <h2>md抓吗</h2>
+            <span>偏好设置工坊</span>
+          </div>
         </div>
-        <div class="brand-title">
-          <h2>md抓吗</h2>
-          <span>偏好设置</span>
-        </div>
+        <div class="header-desc">选择分类独立配置，避免繁杂聚合</div>
       </div>
 
-      <nav class="nav-menu">
-        <a href="#section-selection" class="nav-item active">
-          <span class="nav-icon">✨</span>
-          <span>页面划选设置</span>
-        </a>
-        <a href="#section-obsidian" class="nav-item">
-          <span class="nav-icon">💾</span>
+      <!-- 4 大分类选项卡 (Tab 切换仅展示对应内容) -->
+      <nav class="tab-navigation">
+        <button type="button" class="tab-item active" data-tab="section-selection">
+          <span class="tab-icon">✨</span>
+          <span>页面划选</span>
+        </button>
+        <button type="button" class="tab-item" data-tab="section-obsidian">
+          <span class="tab-icon">💾</span>
           <span>Obsidian 直连</span>
-        </a>
-        <a href="#section-cleaner" class="nav-item">
-          <span class="nav-icon">🧹</span>
+        </button>
+        <button type="button" class="tab-item" data-tab="section-cleaner">
+          <span class="tab-icon">🧹</span>
           <span>清洗去噪</span>
-        </a>
-        <a href="#section-format" class="nav-item">
-          <span class="nav-icon">🎨</span>
+        </button>
+        <button type="button" class="tab-item" data-tab="section-format">
+          <span class="tab-icon">🎨</span>
           <span>排版与媒体</span>
-        </a>
+        </button>
       </nav>
-    </aside>
+    </header>
 
-    <!-- 主设置面板 -->
-    <main class="main-content">
-      <div class="header">
-        <h1>偏好设置工坊</h1>
-        <p class="subtitle">配置网页划选抓取模式、Obsidian Local REST API 密钥与智能排版规则</p>
-      </div>
-
+    <!-- 主表单内容区 (根据当前选中 Tab 单独展示) -->
+    <main class="main-viewport">
       <form id="settingsForm">
         
-        <!-- 1. 新增：页面划选剪藏专属设置 -->
-        <section id="section-selection" class="card">
-          <div class="card-header">
-            <span class="card-header-icon">✨</span>
-            <h3>网页划选剪藏设置</h3>
-          </div>
-
-          <div class="form-group">
-            <label class="checkbox-row">
-              <input type="checkbox" id="enableSelectionBubble" checked>
-              <span class="checkbox-title">启用网页划选像素风高亮圈选与「抓下来」交互弹窗</span>
-            </label>
-            <div class="hint">开启后，在任意浏览器网页中选中文字，将出现像素高亮圈选框及可爱的「抓下来」快捷弹窗。关闭后可仅通过右键菜单抓取。</div>
-          </div>
-
-          <div class="form-group" style="margin-top: 14px;">
-            <label for="selectionSaveMode">划选内容保存模式</label>
-            <select id="selectionSaveMode">
-              <option value="new_file">保存到指定目录下新文件 (默认)</option>
-              <option value="append_file">追加到指定现有文件末尾 (适合做每日摘录/Inbox)</option>
-            </select>
-          </div>
-
-          <div id="appendPathConfig" class="form-group sub-box hidden">
-            <label for="selectionAppendFilePath">追加目标文件相对路径</label>
-            <input type="text" id="selectionAppendFilePath" value="03-知识库/网页剪藏/每日摘录.md" placeholder="例如：03-知识库/网页剪藏/每日摘录.md">
-            <div class="hint">每次划选抓取时，将以时间戳与引用格式自动追加写入该文件文末。</div>
-          </div>
-        </section>
-
-        <!-- 2. Obsidian 仓库与同步服务 -->
-        <section id="section-obsidian" class="card">
-          <div class="card-header">
-            <span class="card-header-icon">💾</span>
-            <h3>Obsidian 仓库与同步服务</h3>
-          </div>
-
-          <div class="form-group">
-            <label for="obsidianSyncMethod">同步模式</label>
-            <select id="obsidianSyncMethod">
-              <option value="downloads">直接导出 / 下载至本地目录 (默认)</option>
-              <option value="rest_api">Obsidian Local REST API (推荐：秒级静默直连写入)</option>
-            </select>
-            <div class="hint">使用 REST API 需在 Obsidian 中安装并启用 Local REST API 社区插件。</div>
-          </div>
-
-          <div id="restApiConfig" class="form-group rest-api-box">
-            <div class="input-grid">
-              <div>
-                <label for="restApiPort">REST API 端口</label>
-                <input type="number" id="restApiPort" value="27124" placeholder="27124">
-              </div>
-              <div>
-                <label for="restApiToken">API Token</label>
-                <input type="password" id="restApiToken" placeholder="Obsidian 插件中生成的 API Key">
+        <!-- 1. 页面划选设置面板 (Tab 1) -->
+        <section id="section-selection" class="tab-panel active">
+          <div class="panel-card">
+            <div class="card-header">
+              <span class="card-header-icon">✨</span>
+              <div class="card-header-meta">
+                <h3>网页划选剪藏设置</h3>
+                <span class="card-desc">配置在网页中用鼠标划选文本时的圈选动效与保存规则</span>
               </div>
             </div>
 
-            <label class="checkbox-row" style="margin-top: 10px;">
-              <input type="checkbox" id="restApiHttps" checked>
-              <span>启用 HTTPS 安全协议 (默认推荐)</span>
-            </label>
-          </div>
+            <div class="form-group">
+              <label class="checkbox-row">
+                <input type="checkbox" id="enableSelectionBubble" checked>
+                <span class="checkbox-title">启用网页划选像素高亮圈选与「抓下来」交互弹窗</span>
+              </label>
+              <div class="hint">开启后，在任意网页中鼠标划选文字，将出现像素高亮圈选框及「⚡ 抓下来」快捷按钮。关闭后可仅通过右键菜单抓取。</div>
+            </div>
 
-          <div class="form-group">
-            <label for="vaultSavePath">默认整页归档相对路径</label>
-            <input type="text" id="vaultSavePath" value="03-知识库/网页剪藏" placeholder="例如：03-知识库/网页剪藏">
-            <div class="hint">相对于 Obsidian 仓库根目录的存放文件夹（支持根据域名自动智能分流）。</div>
-          </div>
+            <div class="form-group" style="margin-top: 16px;">
+              <label for="selectionSaveMode">划选内容保存模式</label>
+              <select id="selectionSaveMode">
+                <option value="new_file">保存到指定目录下新文件 (默认)</option>
+                <option value="append_file">追加到指定现有文件末尾 (适合做每日摘录/Inbox)</option>
+              </select>
+            </div>
 
-          <div class="form-group">
-            <label for="attachmentFolder">图片附件保存子目录</label>
-            <input type="text" id="attachmentFolder" value="attachments" placeholder="attachments">
-          </div>
-        </section>
-
-        <!-- 3. 内容智能清洗与去噪 -->
-        <section id="section-cleaner" class="card">
-          <div class="card-header">
-            <span class="card-header-icon">🧹</span>
-            <h3>内容智能清洗与去噪</h3>
-          </div>
-
-          <div class="form-group">
-            <label class="checkbox-row">
-              <input type="checkbox" id="enableCleaning" checked>
-              <span>启用 DOM 智能去噪 (过滤广告容器、点赞打赏栏与浮层)</span>
-            </label>
-          </div>
-
-          <div class="form-group">
-            <label class="checkbox-row">
-              <input type="checkbox" id="removeNoiseWords" checked>
-              <span>过滤常见引流话术 (点赞关注、求三连、公众号营销套话等)</span>
-            </label>
-          </div>
-
-          <div class="form-group">
-            <label class="checkbox-row">
-              <input type="checkbox" id="removeRedundantBlankLines" checked>
-              <span>清理多余空行与格式规范化</span>
-            </label>
-          </div>
-
-          <div class="form-group">
-            <label for="customBlacklist">自定义黑名单过滤词 / 正则列表 (每行一条)</label>
-            <textarea id="customBlacklist" rows="4" placeholder="关注公众号&#10;长按二维码&#10;/免责声明：.*?$/"></textarea>
-            <div class="hint">支持匹配文本或正则表达式（以 / 开始和结尾）。</div>
+            <div id="appendPathConfig" class="form-group sub-box hidden">
+              <label for="selectionAppendFilePath">追加目标文件相对路径</label>
+              <input type="text" id="selectionAppendFilePath" value="03-知识库/网页剪藏/每日摘录.md" placeholder="例如：03-知识库/网页剪藏/每日摘录.md">
+              <div class="hint">每次划选抓取时，将以时间戳与引用格式自动追加写入该文件末尾。</div>
+            </div>
           </div>
         </section>
 
-        <!-- 4. 排版与多媒体规则 -->
-        <section id="section-format" class="card">
-          <div class="card-header">
-            <span class="card-header-icon">🎨</span>
-            <h3>排版与多媒体规则</h3>
-          </div>
+        <!-- 2. Obsidian 仓库与直连同步面板 (Tab 2) -->
+        <section id="section-obsidian" class="tab-panel hidden">
+          <div class="panel-card">
+            <div class="card-header">
+              <span class="card-header-icon">💾</span>
+              <div class="card-header-meta">
+                <h3>Obsidian 仓库与同步服务</h3>
+                <span class="card-desc">配置直连写入 Obsidian 知识库或本地文件导出</span>
+              </div>
+            </div>
 
-          <div class="form-group">
-            <label for="imageHandling">图片资产本地化策略</label>
-            <select id="imageHandling">
-              <option value="download">全量下载至 Obsidian 附件目录 (推荐，免防盗链失效)</option>
-              <option value="external">保留原始网页外链</option>
-              <option value="base64">内联 Base64 编码</option>
-            </select>
-          </div>
+            <div class="form-group">
+              <label for="obsidianSyncMethod">同步模式</label>
+              <select id="obsidianSyncMethod">
+                <option value="downloads">直接导出 / 下载至本地目录 (默认)</option>
+                <option value="rest_api">Obsidian Local REST API (推荐：秒级静默直连写入)</option>
+              </select>
+              <div class="hint">使用 REST API 需在 Obsidian 中安装并启用 Local REST API 社区插件。</div>
+            </div>
 
-          <div class="form-group">
-            <label class="checkbox-row">
-              <input type="checkbox" id="includeFrontmatter" checked>
-              <span>自动注入 YAML Frontmatter (标题、来源 URL、抓取日期、标签)</span>
-            </label>
-          </div>
+            <div id="restApiConfig" class="form-group rest-api-box hidden">
+              <div class="input-grid">
+                <div>
+                  <label for="restApiPort">REST API 端口</label>
+                  <input type="number" id="restApiPort" value="27124" placeholder="27124">
+                </div>
+                <div>
+                  <label for="restApiToken">API Token</label>
+                  <input type="password" id="restApiToken" placeholder="Obsidian 插件中生成的 API Key">
+                </div>
+              </div>
 
-          <div class="form-group">
-            <label class="checkbox-row">
-              <input type="checkbox" id="enableCallouts" checked>
-              <span>兼容 Obsidian Callout 高亮块语法 (&gt; [!NOTE])</span>
-            </label>
+              <label class="checkbox-row" style="margin-top: 10px;">
+                <input type="checkbox" id="restApiHttps" checked>
+                <span>启用 HTTPS 安全协议 (默认推荐)</span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label for="vaultSavePath">默认整页归档相对路径</label>
+              <input type="text" id="vaultSavePath" value="03-知识库/网页剪藏" placeholder="例如：03-知识库/网页剪藏">
+              <div class="hint">相对于 Obsidian 仓库根目录的存放文件夹（支持根据域名自动智能分流）。</div>
+            </div>
+
+            <div class="form-group">
+              <label for="attachmentFolder">图片附件保存子目录</label>
+              <input type="text" id="attachmentFolder" value="attachments" placeholder="attachments">
+            </div>
           </div>
         </section>
 
-        <!-- 底部提交栏 -->
-        <div class="footer-bar">
-          <button type="submit" id="btnSave" class="btn btn-primary">💾 保存设置</button>
+        <!-- 3. 内容智能清洗与去噪面板 (Tab 3) -->
+        <section id="section-cleaner" class="tab-panel hidden">
+          <div class="panel-card">
+            <div class="card-header">
+              <span class="card-header-icon">🧹</span>
+              <div class="card-header-meta">
+                <h3>内容智能清洗与去噪</h3>
+                <span class="card-desc">自动过滤网页营销广告、浮层干扰与无效引流套话</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-row">
+                <input type="checkbox" id="enableCleaning" checked>
+                <span>启用 DOM 智能去噪 (过滤广告容器、点赞打赏栏与浮层)</span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-row">
+                <input type="checkbox" id="removeNoiseWords" checked>
+                <span>过滤常见引流话术 (点赞关注、求三连、公众号营销套话等)</span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-row">
+                <input type="checkbox" id="removeRedundantBlankLines" checked>
+                <span>清理多余空行与格式规范化</span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label for="customBlacklist">自定义黑名单过滤词 / 正则列表 (每行一条)</label>
+              <textarea id="customBlacklist" rows="5" placeholder="关注公众号&#10;长按二维码&#10;/免责声明：.*?$/"></textarea>
+              <div class="hint">支持匹配文本或正则表达式（以 / 开始和结尾）。</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. 排版与多媒体规则面板 (Tab 4) -->
+        <section id="section-format" class="tab-panel hidden">
+          <div class="panel-card">
+            <div class="card-header">
+              <span class="card-header-icon">🎨</span>
+              <div class="card-header-meta">
+                <h3>排版与多媒体规则</h3>
+                <span class="card-desc">规范化 Markdown 语法、元数据与图片本地化策略</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="imageHandling">图片资产本地化策略</label>
+              <select id="imageHandling">
+                <option value="download">全量下载至 Obsidian 附件目录 (推荐，免防盗链失效)</option>
+                <option value="external">保留原始网页外链</option>
+                <option value="base64">内联 Base64 编码</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-row">
+                <input type="checkbox" id="includeFrontmatter" checked>
+                <span>自动注入 YAML Frontmatter (标题、来源 URL、抓取日期、标签)</span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-row">
+                <input type="checkbox" id="enableCallouts" checked>
+                <span>兼容 Obsidian Callout 高亮块语法 (&gt; [!NOTE])</span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- 底部全局保存栏 (固定在底部或视口底部) -->
+        <div class="sticky-footer">
+          <button type="submit" id="btnSave" class="btn-primary">💾 保存当前设置</button>
           <span id="saveStatus" class="status-msg"></span>
         </div>
+
       </form>
     </main>
+
   </div>
 
   <script src="options.js"></script>
