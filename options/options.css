@@ -1,35 +1,38 @@
-/* options/options.css - 黑曜石剪藏工坊 Options 偏好设置样式 (Obsidian Studio) */
+/* options/options.css - md抓吗 简白高级偏好设置样式 (Minimalist White Studio) */
 
 :root {
-  --bg-obsidian-app: #0B0D10;
-  --bg-obsidian-sidebar: #0E1014;
-  --bg-obsidian-card: #13161C;
-  --bg-obsidian-input: #0E1014;
-  --bg-obsidian-hover: #1A1D24;
+  --bg-app: #FFFFFF;
+  --bg-sidebar: #F9FAFB;
+  --bg-card: #FFFFFF;
+  --bg-input: #FAFAFA;
+  --bg-hover: #F3F4F6;
 
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-focus: rgba(139, 92, 246, 0.4);
-  --border-active: #8B5CF6;
+  --border-light: #E5E7EB;
+  --border-hover: #D1D5DB;
+  --border-focus: #111827;
 
-  --text-primary: #F3F4F6;
-  --text-secondary: #9CA3AF;
-  --text-muted: #64748B;
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-muted: #9CA3AF;
 
-  --accent-obsidian: #8B5CF6;
-  --accent-indigo: #6366F1;
-  --accent-emerald: #10B981;
+  --accent-black: #111827;
+  --accent-black-hover: #1F2937;
+  --accent-emerald: #059669;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.02);
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "PingFang SC", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
 body {
-  background-color: var(--bg-obsidian-app);
+  background-color: var(--bg-app);
   color: var(--text-primary);
   min-height: 100vh;
   display: flex;
@@ -39,230 +42,235 @@ body {
 
 .settings-shell {
   display: flex;
-  max-width: 900px;
+  max-width: 860px;
   width: 100%;
   min-height: 100vh;
+  border-left: 1px solid var(--border-light);
+  border-right: 1px solid var(--border-light);
 }
 
 /* 1. 侧边栏 */
 .sidebar {
-  width: 220px;
-  background: var(--bg-obsidian-sidebar);
-  border-right: 1px solid var(--border-subtle);
-  padding: 24px 16px;
+  width: 200px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-light);
+  padding: 24px 14px;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 24px;
 }
 
 .brand-box {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .brand-glyph {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent-indigo), var(--accent-obsidian));
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background-color: var(--accent-black);
   color: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 14px rgba(139, 92, 246, 0.3);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 .brand-title h2 {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text-primary);
   line-height: 1.2;
 }
 
 .brand-title span {
   font-size: 10px;
-  color: var(--accent-obsidian);
-  font-weight: 600;
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 .nav-menu {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 7px 10px;
   border-radius: 6px;
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 500;
-  transition: all 0.18s ease;
+  transition: all 0.15s ease;
 }
 
-.nav-item:hover, .nav-item.active {
-  background: var(--bg-obsidian-card);
+.nav-item:hover {
+  background: var(--bg-hover);
   color: var(--text-primary);
-  border: 1px solid var(--border-subtle);
 }
 
 .nav-item.active {
-  color: var(--accent-obsidian);
+  background: #FFFFFF;
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
 }
 
-/* 2. 主面板 */
+/* 2. 主内容区 */
 .main-content {
   flex: 1;
-  padding: 28px 36px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+  padding: 28px 32px 60px 32px;
+  overflow-y: auto;
+}
+
+.header {
+  margin-bottom: 24px;
 }
 
 .header h1 {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
 }
 
-.subtitle {
+.header .subtitle {
+  color: var(--text-muted);
   font-size: 12px;
-  color: var(--text-secondary);
-  margin-top: 4px;
 }
 
+/* 表单与卡片 */
 .card {
-  background: var(--bg-obsidian-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow-card);
 }
 
 .card-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 14px;
   padding-bottom: 10px;
-  color: var(--accent-obsidian);
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-primary);
 }
 
 .card-header h3 {
   font-size: 13.5px;
   font-weight: 600;
-  color: var(--text-primary);
 }
 
 .form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  margin-bottom: 14px;
 }
 
-label {
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-group label {
+  display: block;
   font-size: 12px;
   font-weight: 500;
-  color: #D1D5DB;
+  color: var(--text-secondary);
+  margin-bottom: 5px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group input[type="password"],
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: var(--border-focus);
+  background: #FFFFFF;
+  box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.05);
+}
+
+.form-group .hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
 }
 
 .checkbox-row {
-  display: flex;
+  display: flex !important;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   cursor: pointer;
-  user-select: none;
+  font-size: 12px !important;
+  color: var(--text-secondary) !important;
 }
 
 .checkbox-row input[type="checkbox"] {
-  accent-color: var(--accent-obsidian);
-  width: 14px;
-  height: 14px;
-}
-
-input[type="text"],
-input[type="number"],
-input[type="password"],
-textarea,
-select {
-  width: 100%;
-  padding: 8px 11px;
-  border-radius: 6px;
-  border: 1px solid var(--border-subtle);
-  background-color: var(--bg-obsidian-input);
-  color: var(--text-primary);
-  font-size: 12.5px;
-  outline: none;
-  transition: border-color 0.18s ease;
-}
-
-input:focus,
-textarea:focus,
-select:focus {
-  border-color: var(--accent-obsidian);
-}
-
-textarea {
-  resize: vertical;
-  line-height: 1.5;
-  font-family: monospace;
-}
-
-.hint {
-  font-size: 11px;
-  color: var(--text-muted);
+  accent-color: var(--accent-black);
 }
 
 .rest-api-box {
-  background: var(--bg-obsidian-input);
-  border: 1px dashed var(--border-subtle);
-  border-radius: 8px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-light);
   padding: 12px;
+  border-radius: 6px;
 }
 
 .input-grid {
   display: grid;
   grid-template-columns: 100px 1fr;
-  gap: 12px;
+  gap: 10px;
 }
 
+/* 底部提交栏 */
 .footer-bar {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding-top: 10px;
-}
-
-.btn {
-  padding: 9px 22px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  transition: all 0.18s ease;
+  gap: 12px;
+  margin-top: 24px;
 }
 
 .btn-primary {
-  background: var(--accent-obsidian);
+  background: var(--accent-black);
   color: #FFFFFF;
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+  border: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.15s ease;
 }
 
 .btn-primary:hover {
-  background: #7C3AED;
-  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+  background: var(--accent-black-hover);
+  transform: translateY(-1px);
 }
 
 .status-msg {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--accent-emerald);
   font-weight: 500;
 }

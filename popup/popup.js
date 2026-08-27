@@ -1,4 +1,4 @@
-// popup/popup.js - 极致流畅交互、节点动态演进与灵感工作台 (Obsidian Studio)
+// popup/popup.js - md抓吗 极简流畅交互、节点动态演进与工作台
 
 let currentExtractData = null;
 let currentSettings = null;
@@ -73,95 +73,94 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   btnSaveToObsidian.addEventListener('click', () => saveToObsidianStudio());
 
-  inputNewTag.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && inputNewTag.value.trim()) {
-      e.preventDefault();
-      addTagChip(inputNewTag.value.trim());
-      inputNewTag.value = '';
-    }
-  });
+  if (inputNewTag) {
+    inputNewTag.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && inputNewTag.value.trim()) {
+        e.preventDefault();
+        addTagChip(inputNewTag.value.trim());
+        inputNewTag.value = '';
+      }
+    });
+  }
 
-  inputDocTitle.addEventListener('input', () => {
-    if (currentExtractData) {
-      currentExtractData.metadata.title = inputDocTitle.value.trim();
-    }
-  });
+  if (inputDocTitle) {
+    inputDocTitle.addEventListener('input', () => {
+      if (currentExtractData && currentExtractData.metadata) {
+        currentExtractData.metadata.title = inputDocTitle.value.trim();
+      }
+    });
+  }
 });
 
 async function getSettings() {
-  return new Promise(resolve => chrome.storage.sync.get(null, resolve));
+  return new Promise((resolve) => {
+    chrome.storage.sync.get({
+      obsidianSyncMethod: 'downloads',
+      vaultSavePath: '03-知识库/网页剪藏',
+      attachmentFolder: 'attachments',
+      domainRouting: true,
+      enableCleaning: true,
+      removeNoiseWords: true,
+      imageHandling: 'download',
+      autoScroll: true
+    }, (items) => resolve(items));
+  });
 }
 
-// 目标归档路径指示
+// 初始化目标路径显示胶囊
 async function initTargetRouteLabel() {
+  const badge = document.getElementById('routeLabel');
+  if (!badge) return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const routeLabel = document.getElementById('routeLabel');
-  if (tab && tab.url) {
-    if (tab.url.includes('feishu.cn')) routeLabel.innerText = '工作文档';
-    else if (tab.url.includes('shengcaiyoushu.com') || tab.url.includes('zsxq.com')) routeLabel.innerText = '商业社群';
-    else if (tab.url.includes('weixin.qq.com')) routeLabel.innerText = '公众号精选';
-    else routeLabel.innerText = '网页剪藏';
-  }
+  if (!tab || !tab.url) return;
+
+  const url = tab.url;
+  let label = '网页剪藏';
+  if (url.includes('feishu.cn') || url.includes('larksuite.com')) label = '工作文档';
+  else if (url.includes('shengcaiyoushu.com') || url.includes('zsxq.com')) label = '商业社群';
+  else if (url.includes('weixin.qq.com')) label = '公众号精选';
+  else if (url.includes('zhihu.com')) label = '知乎精选';
+  else if (url.includes('yuque.com')) label = '语雀知识库';
+  else if (url.includes('juejin.cn')) label = '掘金技术';
+
+  badge.innerText = label;
 }
 
-// 初始化 Obsidian REST API 联通状态点
-function initObsidianConnectionDot() {
+// 探测 Obsidian Local REST API 连通性
+async function initObsidianConnectionDot() {
   const dot = document.getElementById('obsidianStatusDot');
   if (!dot) return;
-  if (currentSettings && currentSettings.obsidianSyncMethod === 'rest_api') {
-    dot.className = 'status-dot green';
-    dot.title = 'Obsidian Local REST API 已配置静默直连';
-  } else {
+
+  if (currentSettings.obsidianSyncMethod !== 'rest_api') {
     dot.className = 'status-dot';
-    dot.style.backgroundColor = '#9CA3AF';
-    dot.title = '当前为本地导出/下载模式';
-  }
-}
-
-// 节点动态状态机驱动 (Stage Node State Machine)
-function setPipelineStage(stageIndex, statusText, percentVal) {
-  const pipelineFill = document.getElementById('pipelineFill');
-  const pipelinePercent = document.getElementById('pipelinePercent');
-  const pipelineStatusText = document.getElementById('pipelineStatusText');
-
-  if (percentVal !== undefined) {
-    pipelineFill.style.width = `${percentVal}%`;
-    pipelinePercent.innerText = `${percentVal}%`;
-  }
-  if (statusText) {
-    pipelineStatusText.innerText = statusText;
+    dot.title = '当前为本地导出模式';
+    return;
   }
 
-  // 1-indexed stage update
-  for (let i = 1; i <= 5; i++) {
-    const node = document.getElementById(`stageNode${i}`);
-    if (!node) continue;
-    const bullet = node.querySelector('.node-bullet');
-
-    node.classList.remove('running', 'completed', 'skipped');
-
-    if (i < stageIndex) {
-      node.classList.add('completed');
-      bullet.innerHTML = '✓';
-    } else if (i === stageIndex) {
-      node.classList.add('running');
-      bullet.innerHTML = `${i}`;
+  // 探针检测
+  chrome.runtime.sendMessage({ action: 'checkObsidianConnection' }, (res) => {
+    if (res && res.connected) {
+      dot.className = 'status-dot green';
+      dot.title = 'Obsidian Local REST API 在线';
     } else {
-      bullet.innerHTML = `${i}`;
+      dot.className = 'status-dot';
+      dot.title = '未检测到 Obsidian 连接';
     }
-  }
+  });
 }
 
-function renderTags(tags) {
+// 标签芯片渲染与增删
+function renderTags(tags = []) {
   const container = document.getElementById('tagPillsContainer');
+  if (!container) return;
   container.innerHTML = '';
-  (tags || []).forEach(tag => {
+  tags.forEach((tag, idx) => {
     const chip = document.createElement('div');
     chip.className = 'tag-chip';
-    chip.innerHTML = `<span>#${tag}</span><span class="tag-del" data-tag="${tag}">&times;</span>`;
-    chip.querySelector('.tag-del').addEventListener('click', () => {
-      currentExtractData.metadata.tags = currentExtractData.metadata.tags.filter(t => t !== tag);
-      renderTags(currentExtractData.metadata.tags);
+    chip.innerHTML = `<span>#${tag}</span><span class="tag-del" data-idx="${idx}">&times;</span>`;
+    chip.querySelector('.tag-del').addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeTagChip(idx);
     });
     container.appendChild(chip);
   });
@@ -176,75 +175,100 @@ function addTagChip(tag) {
   }
 }
 
-// 渲染 Obsidian Markdown 效果预览
+function removeTagChip(idx) {
+  if (!currentExtractData || !currentExtractData.metadata.tags) return;
+  currentExtractData.metadata.tags.splice(idx, 1);
+  renderTags(currentExtractData.metadata.tags);
+}
+
+// 渲染 Markdown 效果预览
 function renderMarkdownPreview() {
-  const markdownPreview = document.getElementById('markdownPreview');
-  if (!markdownPreview) return;
-  const rawMd = assembleFinalMarkdown();
-  
-  // 简易 Markdown 转 HTML 视觉预览
-  let html = rawMd
-    .replace(/^> \[!NOTE\] (.*$)/gim, '<div style="background:rgba(139,92,246,0.12);border-left:3px solid #8B5CF6;padding:6px 10px;margin:8px 0;border-radius:4px;"><strong style="color:#8B5CF6;">📝 NOTE</strong> $1</div>')
-    .replace(/^### (.*$)/gim, '<h3 style="font-size:13px;color:#F3F4F6;margin:10px 0 4px;">$1</h3>')
-    .replace(/^## (.*$)/gim, '<h2 style="font-size:14px;color:#F3F4F6;margin:12px 0 6px;">$1</h2>')
-    .replace(/^# (.*$)/gim, '<h1 style="font-size:15px;color:#F3F4F6;margin:14px 0 8px;">$1</h1>')
-    .replace(/\[\[(.*?)\]\]/g, '<span style="color:#8B5CF6;background:rgba(139,92,246,0.15);padding:1px 4px;border-radius:3px;">[[$1]]</span>')
-    .replace(/\n/g, '<br>');
+  const preview = document.getElementById('markdownPreview');
+  const code = document.getElementById('markdownCode').value;
+  if (!preview) return;
 
-  markdownPreview.innerHTML = html;
+  // 基础轻量 Markdown 解析渲染
+  let html = code
+    .replace(/^# (.*$)/gim, '<h2 style="font-size:15px; margin: 8px 0 4px;">$1</h2>')
+    .replace(/^## (.*$)/gim, '<h3 style="font-size:13px; margin: 6px 0 3px;">$1</h3>')
+    .replace(/^### (.*$)/gim, '<h4 style="font-size:12px; margin: 4px 0 2px;">$1</h4>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code style="background:#F3F4F6; padding:1px 3px; border-radius:3px; font-size:10px;">$1</code>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color:#2563EB;">$1</a>')
+    .replace(/^\> (.*$)/gim, '<blockquote style="border-left:2px solid #D1D5DB; padding-left:6px; color:#4B5563; margin:4px 0;">$1</blockquote>')
+    .replace(/\n\n/g, '<br/><br/>');
+
+  preview.innerHTML = html;
 }
 
-function showFlyoutToast(text, isSuccess = true) {
-  const flyout = document.getElementById('toastFlyout');
-  const icon = document.getElementById('toastIcon');
-  const body = document.getElementById('toastText');
-  icon.innerText = isSuccess ? '✓' : 'ℹ';
-  body.innerText = text;
-  flyout.classList.remove('hidden');
-  setTimeout(() => flyout.classList.add('hidden'), 2200);
+// 阶段节点与进度推进
+function setPipelineStage(stageNum, text, percent) {
+  const statusText = document.getElementById('pipelineStatusText');
+  const percentText = document.getElementById('pipelinePercent');
+  const bar = document.getElementById('pipelineFill');
+
+  if (statusText) statusText.innerText = text;
+  if (percentText) percentText.innerText = `${percent}%`;
+  if (bar) bar.style.width = `${percent}%`;
+
+  for (let i = 1; i <= 5; i++) {
+    const node = document.getElementById(`stageNode${i}`);
+    if (!node) continue;
+    if (i < stageNum) {
+      node.className = 'stage-node done';
+      node.querySelector('.node-bullet').innerHTML = '✓';
+    } else if (i === stageNum) {
+      node.className = 'stage-node running';
+      node.querySelector('.node-bullet').innerText = `${i}`;
+    } else {
+      node.className = 'stage-node';
+      node.querySelector('.node-bullet').innerText = `${i}`;
+    }
+  }
 }
 
+// 错误提示
 function displayError(msg) {
-  const errBox = document.getElementById('errorAlert');
-  const errMsg = document.getElementById('errorMessage');
-  errMsg.innerText = msg;
-  errBox.classList.remove('hidden');
+  const alert = document.getElementById('errorAlert');
+  const txt = document.getElementById('errorMessage');
+  if (alert && txt) {
+    txt.innerText = msg;
+    alert.classList.remove('hidden');
+  }
 }
 
 function clearError() {
-  document.getElementById('errorAlert').classList.add('hidden');
+  const alert = document.getElementById('errorAlert');
+  if (alert) alert.classList.add('hidden');
 }
 
+// 浮动 Toast 提示
+function showFlyoutToast(msg, isSuccess = true) {
+  const toast = document.getElementById('toastFlyout');
+  const toastIcon = document.getElementById('toastIcon');
+  const toastText = document.getElementById('toastText');
+  if (!toast) return;
+
+  toastIcon.innerText = isSuccess ? '✓' : 'ℹ';
+  toastText.innerText = msg;
+  toast.classList.remove('hidden');
+
+  setTimeout(() => {
+    toast.classList.add('hidden');
+  }, 2400);
+}
+
+// 动态注入 Content Scripts 兜底
 async function ensureContentScripts(tabId) {
-  const scripts = [
-    'utils/logger.js',
-    'utils/sync-queue.js',
-    'lib/turndown.js',
-    'lib/turndown-plugin-gfm.js',
-    'lib/readability.js',
-    'content/cleaner.js',
-    'content/pipeline/transformers.js',
-    'content/pipeline/parser-engine.js',
-    'content/scroller.js',
-    'content/adapters/generic.js',
-    'content/adapters/feishu.js',
-    'content/adapters/shengcai.js',
-    'content/adapters/wechat.js',
-    'content/adapters/zhihu.js',
-    'content/adapters/yuque.js',
-    'content/adapters/notion.js',
-    'content/adapters/juejin.js',
-    'content/extractor.js',
-    'content/ui/bubble.css',
-    'content/ui/bubble.js',
-    'content/index.js'
-  ];
+  try {
+    const isAlive = await chrome.tabs.sendMessage(tabId, { action: 'ping' });
+    if (isAlive && isAlive.status === 'ok') return;
+  } catch (e) {}
 
   try {
-    await chrome.scripting.insertCSS({
-      target: { tabId },
-      files: ['content/ui/bubble.css']
-    });
+    const manifest = chrome.runtime.getManifest();
+    const scripts = manifest.content_scripts[0].js;
     await chrome.scripting.executeScript({
       target: { tabId },
       files: scripts.filter(f => f.endsWith('.js'))
@@ -275,7 +299,7 @@ async function runClipWorkflow(useAutoScroll) {
 
   // 阶段 1: 探测页面容器
   setPipelineStage(1, '正在探测页面滚动容器与结构...', 10);
-  await new Promise(r => setTimeout(r, 200));
+  await new Promise(r => setTimeout(r, 180));
 
   // 监听滚动通知
   const scrollListener = (msg) => {
@@ -292,18 +316,17 @@ async function runClipWorkflow(useAutoScroll) {
       setPipelineStage(2, '正在自动平滑滚动加载...', 20);
       await chrome.tabs.sendMessage(tab.id, { action: 'startAutoScroll', interval: 150 });
     } else {
-      // 若跳过滚动，标记第2阶段为完成并进入阶段3
       const node2 = document.getElementById('stageNode2');
       if (node2) node2.classList.add('skipped');
     }
 
     // 阶段 3: DOM 复杂结构重塑 (Transformers)
     setPipelineStage(3, '正在穿透 Shadow DOM 并重塑复杂结构...', 70);
-    await new Promise(r => setTimeout(r, 180));
+    await new Promise(r => setTimeout(r, 150));
 
     // 阶段 4: 废话与广告智能去噪
     setPipelineStage(4, '正在识别并剔除废话与营销套话...', 85);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 120));
 
     const mergedSettings = {
       ...currentSettings,
@@ -321,7 +344,7 @@ async function runClipWorkflow(useAutoScroll) {
 
     if (res && res.success) {
       setPipelineStage(6, '全量解析完成！', 100);
-      await new Promise(r => setTimeout(r, 250));
+      await new Promise(r => setTimeout(r, 200));
       currentExtractData = res.data;
       showStudio(res.data);
     } else {
@@ -354,13 +377,7 @@ function showStudio(data) {
 function assembleFinalMarkdown() {
   if (!currentExtractData) return '';
   const markdownCode = document.getElementById('markdownCode');
-  let bodyMd = markdownCode.value;
-
-  const annotation = document.getElementById('inputAnnotation').value.trim();
-  if (annotation && !bodyMd.includes(`> [!NOTE] 灵感批注`)) {
-    bodyMd = `> [!NOTE] 灵感批注\n> ${annotation}\n\n` + bodyMd;
-  }
-  return bodyMd;
+  return markdownCode.value;
 }
 
 async function saveToObsidianStudio() {
@@ -373,9 +390,6 @@ async function saveToObsidianStudio() {
   const imgCount = currentExtractData.images?.length || 0;
 
   try {
-    // 统一走 service-worker 后端保存：rest_api / downloads 两种模式都会
-    // 先落盘图片附件（attachments/），再写入 Markdown，并应用智能域名分流。
-    // 附带当前标签页 id：后台图片下载失败时可退回页面上下文抓取
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const res = await chrome.runtime.sendMessage({
       action: 'quickSaveMarkdown',
@@ -395,7 +409,6 @@ async function saveToObsidianStudio() {
       toastText = `Markdown 与 ${imgCount} 张图片已导出至下载目录`;
     }
     if (failedCount > 0) {
-      // 不让个别防盗链图片拖垮整个归档，但要明确告诉用户哪些没下来
       toastText += `，⚠ ${failedCount} 张图片下载失败（多为未登录或防盗链）`;
     }
     showFlyoutToast(toastText, failedCount === 0);
@@ -403,7 +416,7 @@ async function saveToObsidianStudio() {
     displayError(`保存失败: ${err.message}`);
   } finally {
     btnSave.disabled = false;
-    btnSave.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg><span>同步至 Obsidian</span>`;
+    btnSave.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg><span>同步至 Obsidian</span>`;
   }
 }
 
@@ -420,7 +433,7 @@ async function renderLogs() {
   const container = document.getElementById('logsStream');
   const logs = await DramaLogger.getRecentLogs();
   if (logs.length === 0) {
-    container.innerHTML = '<div style="color: #64748B; text-align: center; padding: 20px;">暂无日志</div>';
+    container.innerHTML = '<div style="color: #9CA3AF; text-align: center; padding: 20px;">暂无日志</div>';
     return;
   }
   container.innerHTML = logs.map(l => `

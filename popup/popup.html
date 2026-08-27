@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>md抓马 (MD-Drama) - 黑曜智剪工坊</title>
+  <title>md抓吗 - 网页深度剪藏</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -11,8 +11,8 @@
     <!-- 顶部状态与路由导航栏 -->
     <header class="app-header">
       <div class="brand-cluster">
-        <div class="brand-glyph" title="md抓马 黑曜石深度剪藏">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <div class="brand-glyph" title="md抓吗 极简网页剪藏">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
             <line x1="16" y1="13" x2="8" y2="13"></line>
@@ -20,16 +20,16 @@
           </svg>
         </div>
         <div class="brand-meta">
-          <span class="brand-title">md抓马</span>
-          <span class="version-pill">v1.1.0</span>
+          <span class="brand-title">md抓吗</span>
+          <span class="version-pill">v1.2.0</span>
         </div>
       </div>
 
       <div class="header-tools">
-        <!-- Obsidian 库目标映射胶囊 -->
+        <!-- 目标归档路径指示 -->
         <div id="targetFolderBadge" class="vault-route" title="目标归档路径">
           <span class="status-dot green" id="obsidianStatusDot" title="Obsidian 连接在线"></span>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
           <span id="routeLabel">网页剪藏</span>
         </div>
         <!-- 日志与设置按钮 -->
@@ -42,26 +42,26 @@
       </div>
     </header>
 
-    <!-- 剪藏策略控制面板组 -->
+    <!-- 剪藏策略选项组 -->
     <div class="control-capsules">
-      <label class="capsule-toggle" title="自动模拟平滑滚动，加载懒加载与虚拟滚动内容">
+      <label class="capsule-toggle" title="自动模拟平滑滚动，加载懒加载与虚拟列表内容">
         <input type="checkbox" id="toggleAutoScroll" checked>
         <span class="capsule-pill">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></svg>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></svg>
           深度滚动
         </span>
       </label>
       <label class="capsule-toggle" title="智能过滤广告、营销号套话、引流求关注等废话">
         <input type="checkbox" id="toggleCleaner" checked>
         <span class="capsule-pill">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-          废话去噪
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          去噪清洗
         </span>
       </label>
-      <label class="capsule-toggle" title="完整下载图片资源至 Obsidian 附件目录">
+      <label class="capsule-toggle" title="下载图片附件至本地或 Obsidian">
         <input type="checkbox" id="toggleDownloadImages" checked>
         <span class="capsule-pill">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
           转存图片
         </span>
       </label>
@@ -70,10 +70,9 @@
     <!-- 核心操作区 (Hero Actions) -->
     <div class="action-dock">
       <button id="btnPrimaryCrawl" class="hero-cta">
-        <div class="cta-glow"></div>
         <div class="cta-inner">
           <div class="cta-main">
-            <svg class="cta-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            <svg class="cta-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
             <span class="cta-text">一键智能剪藏</span>
           </div>
           <span class="cta-shortcut">Alt+Shift+S</span>
@@ -81,12 +80,12 @@
       </button>
 
       <button id="btnQuickExtract" class="secondary-btn" title="不触发滚动，直接解析当前已渲染正文">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
         <span>即时解析视口</span>
       </button>
     </div>
 
-    <!-- 5 节点动态流水线指示器 -->
+    <!-- 5 节点极简动态流水线指示器 -->
     <div id="pipelineContainer" class="pipeline-card hidden">
       <div class="pipeline-header">
         <div class="pulse-indicator"></div>
@@ -97,7 +96,7 @@
         <div id="pipelineFill" class="pipeline-bar"></div>
       </div>
       
-      <!-- 5个具有状态演进的节点指示器 -->
+      <!-- 5个状态演进节点 -->
       <div class="pipeline-stages">
         <div class="stage-node running" id="stageNode1">
           <div class="node-bullet">1</div>
@@ -124,7 +123,7 @@
       <button id="btnCancelScroll" class="cancel-link">停止滚动并转换现有内容</button>
     </div>
 
-    <!-- 异常状态反馈 -->
+    <!-- 异常状态提示条 -->
     <div id="errorAlert" class="error-strip hidden">
       <div class="error-icon">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
@@ -135,40 +134,34 @@
     <!-- 剪藏结果工作台 (Studio Panel) -->
     <div id="studioPanel" class="studio-card hidden">
       <div class="doc-header-row">
-        <input type="text" id="inputDocTitle" class="doc-title-input" placeholder="文档标题...">
+        <input type="text" id="inputDocTitle" class="doc-title-input" placeholder="输入文档标题...">
         <div class="meta-pills">
           <span id="badgeWordCount" class="meta-pill">0 字</span>
           <span id="badgeImgCount" class="meta-pill">0 图</span>
         </div>
       </div>
 
-      <!-- 灵感速记与批注条 -->
-      <div class="annotation-row">
-        <span class="callout-badge">NOTE</span>
-        <input type="text" id="inputAnnotation" class="annotation-input" placeholder="添加速记批注 (置于 Obsidian 文首)...">
-      </div>
-
-      <!-- 标签输入条 -->
+      <!-- 标签管理条 -->
       <div class="tags-row">
         <div id="tagPillsContainer" class="tag-chips"></div>
         <input type="text" id="inputNewTag" class="tag-add-input" placeholder="+ 标签">
       </div>
 
-      <!-- 视图模式切换与 Markdown 编辑区 -->
+      <!-- 视图模式切换与编辑器 -->
       <div class="view-mode-bar">
         <button id="btnTabEdit" class="tab-btn active">Markdown 源码</button>
-        <button id="btnTabPreview" class="tab-btn">Obsidian 渲染预览</button>
+        <button id="btnTabPreview" class="tab-btn">效果预览</button>
       </div>
 
       <div class="code-viewport">
-        <textarea id="markdownCode" class="md-editor" spellcheck="false"></textarea>
+        <textarea id="markdownCode" class="md-editor" spellcheck="false" placeholder="解析生成的 Markdown 内容..."></textarea>
         <div id="markdownPreview" class="md-preview hidden"></div>
       </div>
 
-      <!-- 底部动作条 -->
+      <!-- 底部操作按钮栏 -->
       <div class="studio-dock">
         <button id="btnSaveToObsidian" class="btn-vault">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           <span>同步至 Obsidian</span>
         </button>
         <button id="btnCopyMarkdown" class="btn-hollow" title="复制到剪贴板">
@@ -178,13 +171,13 @@
       </div>
     </div>
 
-    <!-- 浮动通知 Toast -->
+    <!-- 浮动轻量 Toast -->
     <div id="toastFlyout" class="toast-flyout hidden">
       <span id="toastIcon" class="toast-glyph">✓</span>
       <span id="toastText" class="toast-body">已完成</span>
     </div>
 
-    <!-- 日志抽屉模态 -->
+    <!-- 运行日志抽屉 -->
     <div id="logsDrawer" class="logs-drawer hidden">
       <div class="drawer-header">
         <div class="drawer-title">
