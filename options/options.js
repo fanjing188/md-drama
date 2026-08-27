@@ -1,13 +1,27 @@
-// options/options.js
+// options/options.js - md抓吗 偏好设置管理
 
 document.addEventListener('DOMContentLoaded', async () => {
   const form = document.getElementById('settingsForm');
   const syncMethodSelect = document.getElementById('obsidianSyncMethod');
   const restApiConfig = document.getElementById('restApiConfig');
+  const selectionSaveModeSelect = document.getElementById('selectionSaveMode');
+  const appendPathConfig = document.getElementById('appendPathConfig');
   const saveStatus = document.getElementById('saveStatus');
 
   // 读取已保存的设置
   chrome.storage.sync.get(null, (items) => {
+    // 划选相关设置
+    if (items.enableSelectionBubble !== undefined) {
+      document.getElementById('enableSelectionBubble').checked = items.enableSelectionBubble;
+    }
+    if (items.selectionSaveMode) {
+      selectionSaveModeSelect.value = items.selectionSaveMode;
+    }
+    if (items.selectionAppendFilePath) {
+      document.getElementById('selectionAppendFilePath').value = items.selectionAppendFilePath;
+    }
+
+    // Obsidian 基础设置
     if (items.obsidianSyncMethod) syncMethodSelect.value = items.obsidianSyncMethod;
     if (items.restApiPort) document.getElementById('restApiPort').value = items.restApiPort;
     if (items.restApiToken) document.getElementById('restApiToken').value = items.restApiToken;
@@ -25,15 +39,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     toggleRestApiVisibility();
+    toggleAppendPathVisibility();
   });
 
   syncMethodSelect.addEventListener('change', toggleRestApiVisibility);
+  selectionSaveModeSelect.addEventListener('change', toggleAppendPathVisibility);
 
   function toggleRestApiVisibility() {
     if (syncMethodSelect.value === 'rest_api') {
-      restApiConfig.style.display = 'block';
+      restApiConfig.classList.remove('hidden');
     } else {
-      restApiConfig.style.display = 'none';
+      restApiConfig.classList.add('hidden');
+    }
+  }
+
+  function toggleAppendPathVisibility() {
+    if (selectionSaveModeSelect.value === 'append_file') {
+      appendPathConfig.classList.remove('hidden');
+    } else {
+      appendPathConfig.classList.add('hidden');
     }
   }
 
@@ -41,6 +65,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
 
     const newSettings = {
+      enableSelectionBubble: document.getElementById('enableSelectionBubble').checked,
+      selectionSaveMode: selectionSaveModeSelect.value,
+      selectionAppendFilePath: document.getElementById('selectionAppendFilePath').value.trim() || '03-知识库/网页剪藏/每日摘录.md',
       obsidianSyncMethod: syncMethodSelect.value,
       restApiPort: parseInt(document.getElementById('restApiPort').value, 10) || 27124,
       restApiToken: document.getElementById('restApiToken').value.trim(),
@@ -57,7 +84,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     chrome.storage.sync.set(newSettings, () => {
-      saveStatus.innerText = '✅ 设置已成功保存！';
+      saveStatus.innerText = '👾 设置已成功保存！';
       setTimeout(() => {
         saveStatus.innerText = '';
       }, 2500);

@@ -1,28 +1,28 @@
-// popup/popup.js - md抓吗 极简流畅交互、节点动态演进与工作台
+// popup/popup.js - md抓吗 可爱像素风交互、当前网页信息与抓取历史记录
 
 let currentExtractData = null;
 let currentSettings = null;
-const logger = new DramaLogger('PopupStudio');
+let currentTabInfo = null;
+const logger = new DramaLogger('PopupPixel');
 
 document.addEventListener('DOMContentLoaded', async () => {
   currentSettings = await getSettings();
-  initTargetRouteLabel();
+  await initCurrentPageInfo();
   initObsidianConnectionDot();
 
-  // 绑定交互事件
+  // 绑定核心交互事件
   const btnPrimaryCrawl = document.getElementById('btnPrimaryCrawl');
-  const btnQuickExtract = document.getElementById('btnQuickExtract');
   const btnCancelScroll = document.getElementById('btnCancelScroll');
   const btnOptions = document.getElementById('btnOptions');
-  const btnLogs = document.getElementById('btnLogs');
-  const btnCloseLogs = document.getElementById('btnCloseLogs');
-  const btnClearLogs = document.getElementById('btnClearLogs');
+  const btnHistory = document.getElementById('btnHistory');
+  const btnCloseHistory = document.getElementById('btnCloseHistory');
+  const btnClearHistory = document.getElementById('btnClearHistory');
   const btnSaveToObsidian = document.getElementById('btnSaveToObsidian');
   const btnCopyMarkdown = document.getElementById('btnCopyMarkdown');
   const inputNewTag = document.getElementById('inputNewTag');
   const inputDocTitle = document.getElementById('inputDocTitle');
 
-  // Tab 模式切换 (Markdown 源码 vs Obsidian 效果预览)
+  // Tab 模式切换
   const btnTabEdit = document.getElementById('btnTabEdit');
   const btnTabPreview = document.getElementById('btnTabPreview');
   const markdownCode = document.getElementById('markdownCode');
@@ -46,21 +46,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   btnOptions.addEventListener('click', () => chrome.runtime.openOptionsPage());
-  btnLogs.addEventListener('click', () => openLogsDrawer());
-  btnCloseLogs.addEventListener('click', () => closeLogsDrawer());
-  btnClearLogs.addEventListener('click', async () => {
-    await DramaLogger.clearLogs();
-    renderLogs();
+  btnHistory.addEventListener('click', () => openHistoryDrawer());
+  btnCloseHistory.addEventListener('click', () => closeHistoryDrawer());
+  btnClearHistory.addEventListener('click', async () => {
+    await chrome.runtime.sendMessage({ action: 'clearClipHistory' });
+    renderHistoryList();
   });
 
+  // 主抓取按钮：抓下来
   btnPrimaryCrawl.addEventListener('click', () => runClipWorkflow(true));
-  btnQuickExtract.addEventListener('click', () => runClipWorkflow(false));
 
   btnCancelScroll.addEventListener('click', async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tab) {
       chrome.tabs.sendMessage(tab.id, { action: 'cancelAutoScroll' });
-      showFlyoutToast('已请求停止滚动');
+      showFlyoutToast('已停止滚动');
     }
   });
 
@@ -102,28 +102,62 @@ async function getSettings() {
       enableCleaning: true,
       removeNoiseWords: true,
       imageHandling: 'download',
-      autoScroll: true
-    }, (items) => resolve(items));
+      autoScroll: true,
+      enableSelectionBubble: true,
+      selectionSaveMode: 'new_file',
+      selectionAppendFilePath: '03-知识库/网页剪藏/每日摘录.md'
+    }, resolve);
   });
 }
 
-// 初始化目标路径显示胶囊
-async function initTargetRouteLabel() {
-  const badge = document.getElementById('routeLabel');
-  if (!badge) return;
+// 获取并渲染当前页面基础信息卡片
+async function initCurrentPageInfo() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab || !tab.url) return;
+  currentTabInfo = tab;
 
   const url = tab.url;
-  let label = '网页剪藏';
-  if (url.includes('feishu.cn') || url.includes('larksuite.com')) label = '工作文档';
-  else if (url.includes('shengcaiyoushu.com') || url.includes('zsxq.com')) label = '商业社群';
-  else if (url.includes('weixin.qq.com')) label = '公众号精选';
-  else if (url.includes('zhihu.com')) label = '知乎精选';
-  else if (url.includes('yuque.com')) label = '语雀知识库';
-  else if (url.includes('juejin.cn')) label = '掘金技术';
+  const title = tab.title || '无标题网页';
+  let host = 'localhost';
+  try {
+    host = new URL(url).hostname;
+  } catch (e) {}
 
-  badge.innerText = label;
+  let siteLabel = '🌐 网页';
+  let routeFolder = '网页剪藏';
+
+  if (url.includes('feishu.cn') || url.includes('larksuite.com')) {
+    siteLabel = '👾 飞书文档';
+    routeFolder = '工作文档';
+  } else if (url.includes('shengcaiyoushu.com') || url.includes('zsxq.com')) {
+    siteLabel = '💰 商业社群';
+    routeFolder = '商业社群';
+  } else if (url.includes('weixin.qq.com')) {
+    siteLabel = '💬 微信公众号';
+    routeFolder = '公众号精选';
+  } else if (url.includes('zhihu.com')) {
+    siteLabel = '💡 知乎专栏/问答';
+    routeFolder = '知乎精选';
+  } else if (url.includes('yuque.com')) {
+    siteLabel = '📚 语雀知识库';
+    routeFolder = '语雀知识库';
+  } else if (url.includes('juejin.cn')) {
+    siteLabel = '💎 掘金技术';
+    routeFolder = '掘金技术';
+  } else if (url.includes('notion.site') || url.includes('notion.so')) {
+    siteLabel = '📝 Notion';
+    routeFolder = 'Notion';
+  }
+
+  const siteTagEl = document.getElementById('pageSiteTag');
+  const pageHostEl = document.getElementById('pageHost');
+  const pageTitleEl = document.getElementById('pageTitlePreview');
+  const routeLabelEl = document.getElementById('routeLabel');
+
+  if (siteTagEl) siteTagEl.innerText = siteLabel;
+  if (pageHostEl) pageHostEl.innerText = host;
+  if (pageTitleEl) pageTitleEl.innerText = title;
+  if (routeLabelEl) routeLabelEl.innerText = routeFolder;
 }
 
 // 探测 Obsidian Local REST API 连通性
@@ -137,7 +171,6 @@ async function initObsidianConnectionDot() {
     return;
   }
 
-  // 探针检测
   chrome.runtime.sendMessage({ action: 'checkObsidianConnection' }, (res) => {
     if (res && res.connected) {
       dot.className = 'status-dot green';
@@ -187,16 +220,15 @@ function renderMarkdownPreview() {
   const code = document.getElementById('markdownCode').value;
   if (!preview) return;
 
-  // 基础轻量 Markdown 解析渲染
   let html = code
-    .replace(/^# (.*$)/gim, '<h2 style="font-size:15px; margin: 8px 0 4px;">$1</h2>')
-    .replace(/^## (.*$)/gim, '<h3 style="font-size:13px; margin: 6px 0 3px;">$1</h3>')
-    .replace(/^### (.*$)/gim, '<h4 style="font-size:12px; margin: 4px 0 2px;">$1</h4>')
+    .replace(/^# (.*$)/gim, '<h2 style="font-size:15px; margin: 8px 0 4px; font-weight:800;">$1</h2>')
+    .replace(/^## (.*$)/gim, '<h3 style="font-size:13px; margin: 6px 0 3px; font-weight:700;">$1</h3>')
+    .replace(/^### (.*$)/gim, '<h4 style="font-size:12px; margin: 4px 0 2px; font-weight:700;">$1</h4>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`([^`]+)`/g, '<code style="background:#F3F4F6; padding:1px 3px; border-radius:3px; font-size:10px;">$1</code>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color:#2563EB;">$1</a>')
-    .replace(/^\> (.*$)/gim, '<blockquote style="border-left:2px solid #D1D5DB; padding-left:6px; color:#4B5563; margin:4px 0;">$1</blockquote>')
+    .replace(/`([^`]+)`/g, '<code style="background:#F6F3EC; padding:1px 3px; border-radius:3px; font-size:10px; border:1px solid #E5E0D5;">$1</code>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color:#2563EB; font-weight:600;">$1</a>')
+    .replace(/^\> (.*$)/gim, '<blockquote style="border-left:2px solid #2D2721; padding-left:6px; color:#6E665D; margin:4px 0; background:#FAF8F5;">$1</blockquote>')
     .replace(/\n\n/g, '<br/><br/>');
 
   preview.innerHTML = html;
@@ -256,7 +288,7 @@ function showFlyoutToast(msg, isSuccess = true) {
 
   setTimeout(() => {
     toast.classList.add('hidden');
-  }, 2400);
+  }, 2600);
 }
 
 // 动态注入 Content Scripts 兜底
@@ -276,12 +308,12 @@ async function ensureContentScripts(tabId) {
   } catch (e) {}
 }
 
-// 执行核心剪藏工作流与流水线动态演进
+// 执行核心剪藏工作流
 async function runClipWorkflow(useAutoScroll) {
   clearError();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab || !tab.id || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('about:')) {
-    displayError('当前系统页面无法提取正文，请在常规网页使用');
+    displayError('当前系统页面无法抓取，请在常规网页使用');
     return;
   }
 
@@ -289,10 +321,6 @@ async function runClipWorkflow(useAutoScroll) {
 
   const pipeline = document.getElementById('pipelineContainer');
   const studioPanel = document.getElementById('studioPanel');
-
-  const enableScroll = document.getElementById('toggleAutoScroll').checked && useAutoScroll;
-  const enableCleaner = document.getElementById('toggleCleaner').checked;
-  const enableImages = document.getElementById('toggleDownloadImages').checked;
 
   pipeline.classList.remove('hidden');
   studioPanel.classList.add('hidden');
@@ -305,16 +333,16 @@ async function runClipWorkflow(useAutoScroll) {
   const scrollListener = (msg) => {
     if (msg.action === 'scrollProgress' && msg.progress) {
       const scrollPct = Math.round(15 + (msg.progress.percent * 0.45)); // 15% ~ 60%
-      setPipelineStage(2, `深度滚动中 (${msg.progress.percent}%)`, scrollPct);
+      setPipelineStage(2, `深度滚动收割中 (${msg.progress.percent}%)`, scrollPct);
     }
   };
   chrome.runtime.onMessage.addListener(scrollListener);
 
   try {
-    if (enableScroll) {
-      // 阶段 2: 深度滚动
-      setPipelineStage(2, '正在自动平滑滚动加载...', 20);
-      await chrome.tabs.sendMessage(tab.id, { action: 'startAutoScroll', interval: 150 });
+    if (useAutoScroll) {
+      // 阶段 2: 深度滚动收割
+      setPipelineStage(2, '正在平滑滚动收割全部内容与图片...', 20);
+      await chrome.tabs.sendMessage(tab.id, { action: 'startAutoScroll', interval: 140 });
     } else {
       const node2 = document.getElementById('stageNode2');
       if (node2) node2.classList.add('skipped');
@@ -328,31 +356,25 @@ async function runClipWorkflow(useAutoScroll) {
     setPipelineStage(4, '正在识别并剔除废话与营销套话...', 85);
     await new Promise(r => setTimeout(r, 120));
 
-    const mergedSettings = {
-      ...currentSettings,
-      enableCleaning: enableCleaner,
-      imageHandling: enableImages ? 'download' : 'external'
-    };
-
     // 阶段 5: 规范排版与 Markdown 序列化
     setPipelineStage(5, '正在排版与 Markdown 序列化...', 95);
 
     const res = await chrome.tabs.sendMessage(tab.id, {
       action: 'extractMarkdown',
-      settings: mergedSettings
+      settings: currentSettings
     });
 
     if (res && res.success) {
-      setPipelineStage(6, '全量解析完成！', 100);
+      setPipelineStage(6, '全量抓取完成！', 100);
       await new Promise(r => setTimeout(r, 200));
       currentExtractData = res.data;
       showStudio(res.data);
     } else {
-      throw new Error(res?.error || '解析异常');
+      throw new Error(res?.error || '抓取异常');
     }
   } catch (err) {
-    logger.error('剪藏发生错误', err.message);
-    displayError(`提取遇到问题: ${err.message}`);
+    logger.error('抓取发生错误', err.message);
+    displayError(`抓取遇到问题: ${err.message}`);
   } finally {
     pipeline.classList.add('hidden');
     chrome.runtime.onMessage.removeListener(scrollListener);
@@ -384,7 +406,7 @@ async function saveToObsidianStudio() {
   if (!currentExtractData) return;
   const btnSave = document.getElementById('btnSaveToObsidian');
   btnSave.disabled = true;
-  btnSave.innerHTML = `<span>写入中...</span>`;
+  btnSave.innerHTML = `<span>⏳ 写入中...</span>`;
 
   const finalMarkdown = assembleFinalMarkdown();
   const imgCount = currentExtractData.images?.length || 0;
@@ -404,41 +426,82 @@ async function saveToObsidianStudio() {
 
     let toastText;
     if (currentSettings.obsidianSyncMethod === 'rest_api') {
-      toastText = `已秒级同步至 Obsidian！${imgCount ? `（含 ${imgCount} 张图片）` : ''}`;
+      toastText = `已成功同步至 Obsidian！${imgCount ? `（含 ${imgCount} 张图片）` : ''}`;
     } else {
-      toastText = `Markdown 与 ${imgCount} 张图片已导出至下载目录`;
+      toastText = `已导出 Markdown 与 ${imgCount} 张图片`;
     }
     if (failedCount > 0) {
-      toastText += `，⚠ ${failedCount} 张图片下载失败（多为未登录或防盗链）`;
+      toastText += `，⚠ ${failedCount} 张图片下载失败`;
     }
     showFlyoutToast(toastText, failedCount === 0);
   } catch (err) {
     displayError(`保存失败: ${err.message}`);
   } finally {
     btnSave.disabled = false;
-    btnSave.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg><span>同步至 Obsidian</span>`;
+    btnSave.innerHTML = `<span>💾 同步至 Obsidian</span>`;
   }
 }
 
-async function openLogsDrawer() {
-  document.getElementById('logsDrawer').classList.remove('hidden');
-  await renderLogs();
+// 历史记录抽屉
+async function openHistoryDrawer() {
+  document.getElementById('historyDrawer').classList.remove('hidden');
+  await renderHistoryList();
 }
 
-function closeLogsDrawer() {
-  document.getElementById('logsDrawer').classList.add('hidden');
+function closeHistoryDrawer() {
+  document.getElementById('historyDrawer').classList.add('hidden');
 }
 
-async function renderLogs() {
-  const container = document.getElementById('logsStream');
-  const logs = await DramaLogger.getRecentLogs();
-  if (logs.length === 0) {
-    container.innerHTML = '<div style="color: #9CA3AF; text-align: center; padding: 20px;">暂无日志</div>';
+async function renderHistoryList() {
+  const container = document.getElementById('historyListContainer');
+  const res = await chrome.runtime.sendMessage({ action: 'getClipHistory' });
+  const list = res?.history || [];
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div class="history-empty">
+        <div style="font-size: 24px; margin-bottom: 6px;">👾</div>
+        <div>暂无历史记录，快去抓一篇吧！</div>
+      </div>
+    `;
     return;
   }
-  container.innerHTML = logs.map(l => `
-    <div class="log-item ${l.level}">
-      [${l.timestamp}] [${l.level}] [${l.module}] ${l.message} ${l.data ? JSON.stringify(l.data) : ''}
-    </div>
-  `).join('');
+
+  container.innerHTML = list.map(item => {
+    const isOk = item.status === 'success';
+    const statusTag = isOk ? `<span class="history-badge success">✓ 成功</span>` : `<span class="history-badge error">❌ 失败</span>`;
+    const modeLabel = item.mode === 'selection_append' ? '选区追加' : (item.mode === 'selection' ? '选区' : '整篇');
+
+    return `
+      <div class="history-card" data-id="${item.id}">
+        <div class="history-meta-row">
+          <div style="display:flex; align-items:center; gap:4px;">
+            ${statusTag}
+            <span style="font-size:9.5px; color:#6E665D; font-weight:700;">[${modeLabel}]</span>
+          </div>
+          <span class="history-time">${item.timeStr || ''}</span>
+        </div>
+        <div class="history-title">${escapeHtml(item.title)}</div>
+        <div class="history-footer">
+          ${item.url ? `<a href="${item.url}" target="_blank" class="history-link" title="在浏览器中打开原网页">🌐 点击直达原网页 &rarr;</a>` : '<span></span>'}
+          <button class="history-del-btn" data-id="${item.id}" title="删除此条记录">🗑️</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // 绑定单条删除事件
+  container.querySelectorAll('.history-del-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = btn.getAttribute('data-id');
+      await chrome.runtime.sendMessage({ action: 'deleteClipHistoryItem', id });
+      renderHistoryList();
+    });
+  });
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

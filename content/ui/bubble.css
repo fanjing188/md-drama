@@ -1,89 +1,136 @@
-/* content/ui/bubble.css - md抓吗 简白高级划选气泡与轻量全局 Toast */
+/* content/ui/bubble.css - md抓吗 可爱像素风划选圈选框与像素风交互弹窗 */
 
+/* 1. 网页划选的像素风高亮圈选框 */
+#md-drama-pixel-outline {
+  position: absolute;
+  z-index: 2147483640;
+  pointer-events: none;
+  border: 2px dashed #2D2721;
+  background-color: rgba(255, 230, 109, 0.22);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8), inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+  transition: all 0.12s ease;
+}
+
+/* 4个像素风角标 */
+.md-drama-corner {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background-color: #2D2721;
+}
+
+.md-drama-corner.tl { top: -4px; left: -4px; }
+.md-drama-corner.tr { top: -4px; right: -4px; }
+.md-drama-corner.bl { bottom: -4px; left: -4px; }
+.md-drama-corner.br { bottom: -4px; right: -4px; }
+
+/* 像素圈选标签说明 */
+.md-drama-selection-tag {
+  position: absolute;
+  top: -20px;
+  left: -2px;
+  background: #2D2721;
+  color: #FFE66D;
+  font-family: ui-monospace, "SF Mono", monospace, -apple-system, sans-serif;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 2px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+/* 2. 交互小弹窗 (可爱文档像素风) */
 #md-drama-bubble {
   position: absolute;
   z-index: 2147483647;
   display: flex;
   align-items: center;
   gap: 6px;
-  background-color: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
-  border-radius: 8px;
-  padding: 5px 10px;
+  background-color: #FFFDF8;
+  border: 2px solid #2D2721;
+  box-shadow: 3px 3px 0 #2D2721;
+  border-radius: 4px;
+  padding: 5px 9px;
   cursor: pointer;
   user-select: none;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "PingFang SC", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
   font-size: 11.5px;
-  font-weight: 600;
-  color: #111827;
-  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.16s ease;
+  font-weight: 700;
+  color: #2D2721;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
 
 #md-drama-bubble:hover {
-  background-color: #FFFFFF;
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.15);
+  background-color: #FFE66D;
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 #2D2721;
+}
+
+#md-drama-bubble:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #2D2721;
 }
 
 .md-drama-bubble-icon {
-  background: #111827;
+  background: #2D2721;
   color: #FFFFFF;
-  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  font-weight: 800;
   font-size: 9px;
   padding: 2px 4px;
-  border-radius: 4px;
-  letter-spacing: 0.5px;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* 全局右上角轻量 Toast */
+.md-drama-bubble-text {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #2D2721;
+}
+
+/* 3. 全局像素风 Toast */
 #md-drama-global-toast {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: 24px;
+  right: 24px;
   z-index: 2147483647;
-  background-color: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.04);
-  color: #111827;
+  background-color: #FFFDF8;
+  border: 2px solid #2D2721;
+  box-shadow: 4px 4px 0 #2D2721;
+  color: #2D2721;
   padding: 8px 14px;
-  border-radius: 8px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
   font-size: 12px;
-  font-weight: 500;
-  animation: drama-toast-in 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  font-weight: 700;
+  animation: drama-pixel-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 #md-drama-global-toast.toast-success {
-  border-color: rgba(5, 150, 105, 0.3);
-}
-
-#md-drama-global-toast.toast-success .toast-mark {
-  color: #059669;
-  font-weight: 800;
+  background-color: #E8FBF2;
+  border-color: #1E6B4A;
+  box-shadow: 4px 4px 0 #1E6B4A;
+  color: #1E6B4A;
 }
 
 #md-drama-global-toast.toast-error {
-  border-color: rgba(220, 38, 38, 0.3);
+  background-color: #FFF0F0;
+  border-color: #991B1B;
+  box-shadow: 4px 4px 0 #991B1B;
+  color: #991B1B;
 }
 
-#md-drama-global-toast.toast-error .toast-mark {
-  color: #DC2626;
-  font-weight: 800;
-}
-
-@keyframes drama-toast-in {
+@keyframes drama-pixel-in {
   from {
     opacity: 0;
-    transform: translateY(-8px) scale(0.97);
+    transform: translateY(-8px) scale(0.96);
   }
   to {
     opacity: 1;
