@@ -7,8 +7,9 @@ const DEFAULT_SETTINGS = {
   restApiHttps: false,             // 默认推荐使用标准 HTTP 协议
   vaultName: 'fanjing_notes',
   vaultSavePath: '03-知识库/网页剪藏',
-  attachmentFolder: 'attachments',
+  attachmentFolder: 'attachments', // 全局统一图片资源文件夹
   imageHandling: 'download',
+  autoSaveDirectly: true,          // 抓取完成后直接保存到 Obsidian（无需二次手动点击）
   autoScrollSpeed: 'normal',
   includeFrontmatter: true,
   enableMathJax: true,
@@ -20,7 +21,7 @@ const DEFAULT_SETTINGS = {
   
   // 划选页面交互与保存模式配置
   enableSelectionBubble: true,
-  selectionSaveMode: 'new_file',
+  selectionSaveMode: 'new_file',    // 'new_file' | 'append_file'
   selectionAppendFilePath: '03-知识库/网页剪藏/每日摘录.md',
 
   customBlacklist: [
@@ -49,6 +50,9 @@ const DEFAULT_SETTINGS = {
   ]
 };
 
+// 后台常驻任务跟踪池（即使切换标签页或关闭弹窗，任务也持续在后台完成并保存）
+const activeCrawlTasks = new Map();
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.sync.get(null, (items) => {
     const newSettings = { ...DEFAULT_SETTINGS, ...items };
@@ -73,7 +77,7 @@ chrome.runtime.onInstalled.addListener(() => {
 function getTargetFolder(url, settings) {
   if (settings.domainRouting && Array.isArray(settings.domainRouting)) {
     for (const route of settings.domainRouting) {
-      if (route.domain && url.includes(route.domain)) {
+      if (route.domain && url && url.includes(route.domain)) {
         return route.path;
       }
     }
@@ -133,7 +137,7 @@ async function executeSilentClip(tab) {
 
     chrome.tabs.sendMessage(tab.id, {
       action: 'showToast',
-      message: '正在抓取网页正文与图片...',
+      message: '正在深度抓取正文与图片...',
       type: 'info'
     }).catch(() => {});
 
@@ -172,6 +176,86 @@ async function executeSilentClip(tab) {
   }
 }
 
+// 后台常驻全量流水线任务执行（后台接管，即使用户切换标签页或关闭弹窗也保证完成）
+async function executeBackgroundCrawlWorkflow(tabId, tabUrl, useAutoScroll = true) {
+  const settings = await getSettings();
+  const taskState = {
+    tabId,
+    status: 'running',
+    stage: 1,
+    stageText: '正在启动抓取引擎...',
+    percent: 10,
+    data: null,
+    saveResult: null,
+    error: null,
+    timestamp: Date.now()
+  };
+  activeCrawlTasks.set(tabId, taskState);
+
+  try {
+    await ensureContentScripts(tabId);
+    
+    // 通知页面开始流程
+    const crawlPromise = chrome.tabs.sendMessage(tabId, {
+      action: 'startWorkflow',
+      useAutoScroll: useAutoScroll,
+      settings: settings
+    });
+
+    const res = await crawlPromise;
+    if (!res || !res.success || !res.state?.data) {
+      throw new Error(res?.error || res?.state?.error || '抓取未能提取到有效正文');
+    }
+
+    const extractData = res.state.data;
+    taskState.stage = 6;
+    taskState.percent = 100;
+    taskState.data = extractData;
+
+    // 若开启了自动直接保存（默认开启）
+    if (settings.autoSaveDirectly) {
+      taskState.stageText = '正在自动归档至 Obsidian 知识库...';
+      const saveRes = await saveToObsidianBackend(extractData, tabUrl, settings, tabId, false);
+      taskState.status = 'saved';
+      taskState.saveResult = saveRes;
+      taskState.stageText = '已成功归档至 Obsidian！';
+
+      chrome.tabs.sendMessage(tabId, {
+        action: 'showToast',
+        message: '✓ 已成功抓下来并归档！',
+        type: 'success'
+      }).catch(() => {});
+    } else {
+      taskState.status = 'completed';
+      taskState.stageText = '全量解析完成！';
+    }
+
+    activeCrawlTasks.set(tabId, taskState);
+    return taskState;
+  } catch (err) {
+    taskState.status = 'error';
+    taskState.error = err.message;
+    taskState.stageText = `抓取失败: ${err.message}`;
+    activeCrawlTasks.set(tabId, taskState);
+
+    await recordClipHistory({
+      title: '抓取失败',
+      url: tabUrl,
+      status: 'error',
+      mode: 'full',
+      error: err.message
+    });
+
+    chrome.tabs.sendMessage(tabId, {
+      action: 'showToast',
+      message: `❌ 抓取失败: ${err.message}`,
+      type: 'error'
+    }).catch(() => {});
+
+    throw err;
+  }
+}
+
 async function getSettings() {
   return new Promise(resolve => chrome.storage.sync.get(null, resolve));
 }
@@ -198,6 +282,42 @@ function getApiEndpointCandidates(settings, subPath = '') {
 
 // 消息路由
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // 启动后台接管的抓取任务
+  if (request.action === 'startBackgroundCrawl') {
+    const tabId = request.tabId || sender.tab?.id;
+    const tabUrl = request.url || sender.tab?.url || '';
+    const useAutoScroll = Boolean(request.useAutoScroll);
+
+    executeBackgroundCrawlWorkflow(tabId, tabUrl, useAutoScroll)
+      .then(state => sendResponse({ success: true, state }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
+  // 查询后台常驻任务状态
+  if (request.action === 'getBackgroundTaskState') {
+    const tabId = request.tabId || sender.tab?.id;
+    const state = activeCrawlTasks.get(tabId) || null;
+    sendResponse({ success: true, state });
+    return true;
+  }
+
+  // 重置后台任务状态
+  if (request.action === 'resetBackgroundTask') {
+    const tabId = request.tabId || sender.tab?.id;
+    activeCrawlTasks.delete(tabId);
+    sendResponse({ success: true });
+    return true;
+  }
+
+  // 同步来自 content script 的进度广播
+  if (request.action === 'workflowProgress' && sender.tab?.id) {
+    const tabId = sender.tab.id;
+    const existing = activeCrawlTasks.get(tabId) || {};
+    activeCrawlTasks.set(tabId, { ...existing, ...request.state, tabId });
+    return true;
+  }
+
   if (request.action === 'quickSaveMarkdown') {
     getSettings().then(settings => {
       const pageUrl = request.data?.metadata?.source || sender.tab?.url || '';
@@ -299,7 +419,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// 后台保存处理器（支持全量保存与选区追加/独立文件保存两种模式）
+// 后台保存处理器（整篇保存与划选保存共用全局统一图片资源配置）
 async function saveToObsidianBackend(extractData, url, settings, tabId, isSelection = false) {
   const isAppendMode = isSelection && (settings.selectionSaveMode === 'append_file');
   let fullPath = '';
@@ -307,6 +427,8 @@ async function saveToObsidianBackend(extractData, url, settings, tabId, isSelect
   const title = extractData.metadata.title || '无标题文档';
   const wordCount = extractData.markdown ? extractData.markdown.length : 0;
   const imgCount = extractData.images?.length || 0;
+  const targetFolder = getTargetFolder(url, settings);
+  const attachmentDirName = settings.attachmentFolder || 'attachments';
 
   try {
     if (isAppendMode) {
@@ -364,17 +486,16 @@ async function saveToObsidianBackend(extractData, url, settings, tabId, isSelect
       return { path: fullPath, mode: 'append', savedImages: 0, failedImages: [] };
     }
 
-    // 模式 1: 保存为新文件
-    const targetFolder = getTargetFolder(url, settings);
-    const filename = `${title}.md`;
+    // 模式 1: 保存为新文件（整页归档或划选新增文件）
+    const filename = isSelection ? `选区摘录-${title}.md` : `${title}.md`;
     fullPath = `${targetFolder}/${filename}`.replace(/\/+/g, '/');
 
     if (settings.obsidianSyncMethod === 'rest_api') {
-      // 1. 下载图片附件
+      // 1. 全局统一图片附件保存
       if (settings.imageHandling === 'download' && extractData.images?.length > 0) {
         for (const img of extractData.images) {
           try {
-            const imgPath = `${targetFolder}/${settings.attachmentFolder || 'attachments'}/${img.filename}`.replace(/\/+/g, '/');
+            const imgPath = `${targetFolder}/${attachmentDirName}/${img.filename}`.replace(/\/+/g, '/');
             const imgBase64 = await fetchImageAsBase64(img.originalUrl, tabId);
             await saveToObsidianRestApi({
               path: imgPath,
@@ -400,7 +521,7 @@ async function saveToObsidianBackend(extractData, url, settings, tabId, isSelect
       // 导出文件模式
       if (settings.imageHandling === 'download' && extractData.images?.length > 0) {
         for (const img of extractData.images) {
-          const imgPath = `Obsidian_Vault/${targetFolder}/${settings.attachmentFolder || 'attachments'}/${img.filename}`.replace(/\/+/g, '/');
+          const imgPath = `Obsidian_Vault/${targetFolder}/${attachmentDirName}/${img.filename}`.replace(/\/+/g, '/');
           try {
             const imgBase64 = await fetchImageAsBase64(img.originalUrl, tabId);
             await handleDownload({

@@ -1,8 +1,9 @@
-// popup/popup.js - MD抓吗 可爱像素风交互、当前网页信息与抓取历史记录
+// popup/popup.js - MD抓吗 可爱像素风交互、后台常驻任务接管与保存成功展示
 
 let currentExtractData = null;
 let currentSettings = null;
 let currentTabInfo = null;
+let currentSaveResult = null;
 const logger = new DramaLogger('PopupPixel');
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -21,7 +22,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const inputNewTag = document.getElementById('inputNewTag');
   const inputDocTitle = document.getElementById('inputDocTitle');
 
-  // Tab 模式切换
+  // 保存成功面板按钮
+  const btnSuccessCopy = document.getElementById('btnSuccessCopy');
+  const btnSuccessViewEdit = document.getElementById('btnSuccessViewEdit');
+  const btnSuccessNewCrawl = document.getElementById('btnSuccessNewCrawl');
+
+  // Tab 模式切换 (Markdown 源码 vs 渲染预览)
   const btnTabEdit = document.getElementById('btnTabEdit');
   const btnTabPreview = document.getElementById('btnTabPreview');
   const markdownCode = document.getElementById('markdownCode');
@@ -56,9 +62,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   btnPrimaryCrawl.addEventListener('click', () => runClipWorkflow(true));
 
   btnCancelScroll.addEventListener('click', async () => {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab) {
-      chrome.tabs.sendMessage(tab.id, { action: 'cancelAutoScroll' });
+    if (currentTabInfo && currentTabInfo.id) {
+      chrome.tabs.sendMessage(currentTabInfo.id, { action: 'cancelAutoScroll' }).catch(() => {});
       showFlyoutToast('已停止滚动');
     }
   });
@@ -71,6 +76,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   btnSaveToObsidian.addEventListener('click', () => saveToObsidianStudio());
+
+  // 成功面板快捷操作
+  if (btnSuccessCopy) {
+    btnSuccessCopy.addEventListener('click', () => {
+      const md = assembleFinalMarkdown();
+      navigator.clipboard.writeText(md).then(() => {
+        showFlyoutToast('✓ Markdown 已复制');
+      });
+    });
+  }
+
+  if (btnSuccessViewEdit) {
+    btnSuccessViewEdit.addEventListener('click', () => {
+      document.getElementById('successPanel').classList.add('hidden');
+      if (currentExtractData) {
+        showStudio(currentExtractData);
+      }
+    });
+  }
+
+  if (btnSuccessNewCrawl) {
+    btnSuccessNewCrawl.addEventListener('click', () => {
+      resetPopupToHome();
+    });
+  }
 
   if (inputNewTag) {
     inputNewTag.addEventListener('keydown', (e) => {
@@ -89,6 +119,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+
+  // 恢复后台常驻任务状态（如果切换回该网页）
+  await restoreOngoingTaskState();
 });
 
 async function getSettings() {
@@ -101,6 +134,7 @@ async function getSettings() {
       enableCleaning: true,
       removeNoiseWords: true,
       imageHandling: 'download',
+      autoSaveDirectly: true,
       autoScroll: true,
       enableSelectionBubble: true,
       selectionSaveMode: 'new_file',
@@ -147,6 +181,35 @@ async function initCurrentPageInfo() {
   if (siteTagEl) siteTagEl.innerText = siteLabel;
   if (pageHostEl) pageHostEl.innerText = host;
   if (pageTitleEl) pageTitleEl.innerText = title;
+}
+
+// 恢复后台常驻任务状态
+async function restoreOngoingTaskState() {
+  if (!currentTabInfo || !currentTabInfo.id) return;
+  const res = await chrome.runtime.sendMessage({
+    action: 'getBackgroundTaskState',
+    tabId: currentTabInfo.id
+  }).catch(() => null);
+
+  if (res && res.state) {
+    const task = res.state;
+    if (task.status === 'running') {
+      const pageInfoCard = document.getElementById('pageInfoCard');
+      const actionDock = document.getElementById('actionDock');
+      const pipeline = document.getElementById('pipelineContainer');
+      pageInfoCard.classList.add('hidden');
+      actionDock.classList.add('hidden');
+      pipeline.classList.remove('hidden');
+      setPipelineStage(task.stage || 2, task.stageText || '后台深度抓取中...', task.percent || 40);
+    } else if (task.status === 'saved' && task.data) {
+      currentExtractData = task.data;
+      currentSaveResult = task.saveResult;
+      showSuccessScreen(task.data, task.saveResult);
+    } else if (task.status === 'completed' && task.data) {
+      currentExtractData = task.data;
+      showStudio(task.data);
+    }
+  }
 }
 
 // 标签芯片渲染与增删
@@ -275,7 +338,7 @@ async function ensureContentScripts(tabId) {
   } catch (e) {}
 }
 
-// 执行核心剪藏工作流 (点击抓下来后：隐藏原操作区，展示抓取进度板块)
+// 执行核心剪藏工作流 (后台常驻接管，切换标签页正常执行)
 async function runClipWorkflow(useAutoScroll) {
   clearError();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -290,68 +353,92 @@ async function runClipWorkflow(useAutoScroll) {
   const actionDock = document.getElementById('actionDock');
   const pipeline = document.getElementById('pipelineContainer');
   const studioPanel = document.getElementById('studioPanel');
+  const successPanel = document.getElementById('successPanel');
 
-  // 1. 隐藏原操作区与页面信息卡片，展示抓取进度板块
+  // 1. 隐藏操作区，展示抓取进度板块
   pageInfoCard.classList.add('hidden');
   actionDock.classList.add('hidden');
   pipeline.classList.remove('hidden');
   studioPanel.classList.add('hidden');
+  successPanel.classList.add('hidden');
 
-  // 阶段 1: 探测页面容器
   setPipelineStage(1, '正在探测页面滚动容器与结构...', 10);
-  await new Promise(r => setTimeout(r, 180));
 
-  // 监听滚动通知
-  const scrollListener = (msg) => {
-    if (msg.action === 'scrollProgress' && msg.progress) {
-      const scrollPct = Math.round(15 + (msg.progress.percent * 0.45));
-      setPipelineStage(2, `深度滚动收割中 (${msg.progress.percent}%)`, scrollPct);
+  // 监听来自 content script 的进度广播
+  const progressListener = (msg) => {
+    if (msg.action === 'workflowProgress' && msg.state) {
+      const st = msg.state;
+      setPipelineStage(st.stage || 2, st.stageText || '深度解析中...', st.percent || 50);
     }
   };
-  chrome.runtime.onMessage.addListener(scrollListener);
+  chrome.runtime.onMessage.addListener(progressListener);
 
   try {
-    if (useAutoScroll) {
-      // 阶段 2: 深度滚动收割
-      setPipelineStage(2, '正在平滑滚动收割全部内容与图片...', 20);
-      await chrome.tabs.sendMessage(tab.id, { action: 'startAutoScroll', interval: 140 });
-    }
-
-    // 阶段 3: DOM 复杂结构重塑 (Transformers)
-    setPipelineStage(3, '正在穿透 Shadow DOM 并重塑复杂结构...', 70);
-    await new Promise(r => setTimeout(r, 150));
-
-    // 阶段 4: 废话与广告智能去噪
-    setPipelineStage(4, '正在识别并剔除废话与营销套话...', 85);
-    await new Promise(r => setTimeout(r, 120));
-
-    // 阶段 5: 规范排版与 Markdown 序列化
-    setPipelineStage(5, '正在排版与 Markdown 序列化...', 95);
-
-    const res = await chrome.tabs.sendMessage(tab.id, {
-      action: 'extractMarkdown',
-      settings: currentSettings
+    // 委托后台 Service Worker 接管流水线，即使用户关闭弹窗也能完整执行并归档
+    const res = await chrome.runtime.sendMessage({
+      action: 'startBackgroundCrawl',
+      tabId: tab.id,
+      url: tab.url,
+      useAutoScroll: useAutoScroll
     });
 
-    if (res && res.success) {
-      setPipelineStage(6, '全量抓取完成！', 100);
-      await new Promise(r => setTimeout(r, 200));
+    if (res && res.success && res.state) {
+      const taskState = res.state;
+      currentExtractData = taskState.data;
+      currentSaveResult = taskState.saveResult;
+
       pipeline.classList.add('hidden');
-      currentExtractData = res.data;
-      showStudio(res.data);
+
+      if (taskState.status === 'saved') {
+        showSuccessScreen(taskState.data, taskState.saveResult);
+      } else {
+        showStudio(taskState.data);
+      }
     } else {
       throw new Error(res?.error || '抓取异常');
     }
   } catch (err) {
     logger.error('抓取发生错误', err.message);
     displayError(`抓取遇到问题: ${err.message}`);
-    // 发生错误时，恢复显示操作区供用户重试
     pipeline.classList.add('hidden');
     pageInfoCard.classList.remove('hidden');
     actionDock.classList.remove('hidden');
   } finally {
-    chrome.runtime.onMessage.removeListener(scrollListener);
+    chrome.runtime.onMessage.removeListener(progressListener);
   }
+}
+
+// 展示保存成功页面与专属 Logo
+function showSuccessScreen(data, saveResult) {
+  const successPanel = document.getElementById('successPanel');
+  const successDocTitle = document.getElementById('successDocTitle');
+  const successDocPath = document.getElementById('successDocPath');
+  const successDocStats = document.getElementById('successDocStats');
+
+  const title = data.metadata?.title || '无标题文档';
+  const filePath = saveResult?.path || `${currentSettings.vaultSavePath || '03-知识库/网页剪藏'}/${title}.md`;
+  const wordCount = data.markdown ? data.markdown.length : 0;
+  const imgCount = data.images?.length || 0;
+
+  successDocTitle.innerText = title;
+  successDocPath.innerText = filePath;
+  successDocStats.innerText = `📝 ${wordCount} 字 · 🖼️ ${imgCount} 张图片`;
+
+  document.getElementById('pipelineContainer').classList.add('hidden');
+  document.getElementById('pageInfoCard').classList.add('hidden');
+  document.getElementById('actionDock').classList.add('hidden');
+  document.getElementById('studioPanel').classList.add('hidden');
+  successPanel.classList.remove('hidden');
+}
+
+// 重置回首页初始操作状态
+function resetPopupToHome() {
+  document.getElementById('successPanel').classList.add('hidden');
+  document.getElementById('studioPanel').classList.add('hidden');
+  document.getElementById('pipelineContainer').classList.add('hidden');
+  document.getElementById('pageInfoCard').classList.remove('hidden');
+  document.getElementById('actionDock').classList.remove('hidden');
+  clearError();
 }
 
 function showStudio(data) {
@@ -362,17 +449,17 @@ function showStudio(data) {
   const markdownCode = document.getElementById('markdownCode');
 
   studioPanel.classList.remove('hidden');
-  inputDocTitle.value = data.metadata.title;
-  badgeWordCount.innerText = `${data.markdown.length} 字`;
-  badgeImgCount.innerText = `${data.images.length} 图`;
-  markdownCode.value = data.markdown;
-  renderTags(data.metadata.tags);
+  inputDocTitle.value = data.metadata?.title || '无标题文档';
+  badgeWordCount.innerText = `${data.markdown?.length || 0} 字`;
+  badgeImgCount.innerText = `${data.images?.length || 0} 图`;
+  markdownCode.value = data.markdown || '';
+  renderTags(data.metadata?.tags || []);
 }
 
 function assembleFinalMarkdown() {
   if (!currentExtractData) return '';
   const markdownCode = document.getElementById('markdownCode');
-  return markdownCode.value;
+  return (markdownCode && markdownCode.value) ? markdownCode.value : (currentExtractData.markdown || '');
 }
 
 async function saveToObsidianStudio() {
@@ -407,6 +494,9 @@ async function saveToObsidianStudio() {
       toastText += `，⚠ ${failedCount} 张图片下载失败`;
     }
     showFlyoutToast(toastText, failedCount === 0);
+
+    // 保存后切换到成功面板
+    showSuccessScreen(currentExtractData, res.result);
   } catch (err) {
     displayError(`保存失败: ${err.message}`);
   } finally {

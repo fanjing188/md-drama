@@ -134,14 +134,23 @@
             </div>
 
             <div class="form-group">
-              <label for="vaultSavePath">默认整页归档相对路径</label>
-              <input type="text" id="vaultSavePath" value="03-知识库/网页剪藏" placeholder="例如：03-知识库/网页剪藏">
-              <div class="hint">相对于 Obsidian 仓库根目录的存放文件夹（支持根据域名自动智能分流）。</div>
+              <label class="checkbox-row">
+                <input type="checkbox" id="autoSaveDirectly" checked>
+                <span>自动直接归档：抓取完成后直接保存至知识库 (无需在弹窗中再次手动确认)</span>
+              </label>
+              <div class="hint">开启后，点击「抓下来」全量提取完成后立即自动保存并呈现归档成功页面。</div>
             </div>
 
             <div class="form-group">
-              <label for="attachmentFolder">图片附件保存子目录</label>
+              <label for="vaultSavePath">默认整页归档相对路径</label>
+              <input type="text" id="vaultSavePath" value="03-知识库/网页剪藏" placeholder="例如：03-知识库/网页剪藏">
+              <div class="hint">相对于 Obsidian 仓库根目录的存放文件夹（每抓一个页面直接在此目录下新增文档）。</div>
+            </div>
+
+            <div class="form-group">
+              <label for="attachmentFolder">图片附件保存统一子目录</label>
               <input type="text" id="attachmentFolder" value="attachments" placeholder="attachments">
+              <div class="hint">所有下载的图片资源将保存在此统一文件夹里，方便集中管理。</div>
             </div>
           </div>
         </section>

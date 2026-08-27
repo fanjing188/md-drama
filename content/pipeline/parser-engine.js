@@ -42,8 +42,7 @@ class UniversalParserEngine {
       }
     });
 
-    // 处理图片：保留图片在上下文中的原始位置（行内图片保持行内，独立图片自成段落），
-    // alt/title 做最小化转义，避免生成未闭合/损坏的 Markdown 图片语法
+    // 处理图片：前后双换行隔离自成段落，避免被挤在行内或缩为小图标，确保在 Obsidian 中全宽自适应呈现
     service.addRule('images', {
       filter: 'img',
       replacement: (content, node) => {
@@ -54,11 +53,11 @@ class UniversalParserEngine {
         const src = node.getAttribute('src') || node.getAttribute('data-src') || '';
         if (!src) return '';
         if (node.getAttribute('data-obsidian-wiki') === 'true') {
-          return `![[${src}]]`;
+          return `\n\n![[${src}]]\n\n`;
         }
         const rawTitle = node.getAttribute('title');
         const title = rawTitle ? ` "${rawTitle.replace(/["\r\n]/g, ' ').trim()}"` : '';
-        return `![${alt}](${src}${title})`;
+        return `\n\n![${alt}](${src}${title})\n\n`;
       }
     });
 

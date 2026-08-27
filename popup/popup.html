@@ -93,6 +93,43 @@
       <div id="errorMessage" class="error-text"></div>
     </div>
 
+    <!-- 4. 保存成功专属呈现面板 (可爱 Logo + 归档卡片 + 快捷操作) -->
+    <div id="successPanel" class="success-card hidden">
+      <div class="success-logo-wrap">
+        <img src="../icons/icon128.png" class="success-logo-img" alt="MD抓吗">
+        <div class="success-sparkle">✨</div>
+      </div>
+
+      <div class="success-title">🎉 已成功抓下来并归档！</div>
+
+      <div class="success-meta-card">
+        <div class="success-meta-row">
+          <span class="meta-label">文档标题:</span>
+          <span id="successDocTitle" class="meta-val title-val">...</span>
+        </div>
+        <div class="success-meta-row">
+          <span class="meta-label">保存位置:</span>
+          <span id="successDocPath" class="meta-val path-val">03-知识库/网页剪藏/...</span>
+        </div>
+        <div class="success-meta-row">
+          <span class="meta-label">抓取统计:</span>
+          <span id="successDocStats" class="meta-val stats-val">📝 0 字 · 🖼️ 0 图</span>
+        </div>
+      </div>
+
+      <div class="success-actions">
+        <button id="btnSuccessCopy" class="btn-success-action" title="复制 Markdown 内容到剪贴板">
+          <span>📋 复制 MD</span>
+        </button>
+        <button id="btnSuccessViewEdit" class="btn-success-action hollow" title="展开源码编辑器进行预览与微调">
+          <span>👾 预览/编辑</span>
+        </button>
+        <button id="btnSuccessNewCrawl" class="btn-success-action primary" title="返回主界面继续抓取">
+          <span>⚡ 继续抓取</span>
+        </button>
+      </div>
+    </div>
+
     <!-- 剪藏结果工作台 (Studio Panel) -->
     <div id="studioPanel" class="studio-card hidden">
       <div class="doc-header-row">

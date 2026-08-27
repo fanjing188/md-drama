@@ -402,6 +402,166 @@ body.history-expanded {
   font-size: 13px;
 }
 
+/* 5.5 保存成功专属呈现面板 (Success Screen with Cute Logo) */
+.success-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: var(--pixel-bg-card);
+  border: 2px solid var(--pixel-border);
+  box-shadow: var(--pixel-shadow);
+  border-radius: 6px;
+  padding: 16px 14px;
+  animation: panel-pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes panel-pop {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.success-logo-wrap {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  background-color: var(--pixel-yellow);
+  border: 2.5px solid var(--pixel-border);
+  box-shadow: var(--pixel-shadow-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.success-logo-img {
+  width: 38px;
+  height: 38px;
+  display: block;
+}
+
+.success-sparkle {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  font-size: 16px;
+  animation: sparkle-float 1.2s infinite alternate ease-in-out;
+}
+
+@keyframes sparkle-float {
+  from { transform: translateY(0) rotate(0deg); }
+  to { transform: translateY(-4px) rotate(15deg); }
+}
+
+.success-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--pixel-text);
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+
+.success-meta-card {
+  width: 100%;
+  background: var(--pixel-bg-subtle);
+  border: 1.5px solid var(--pixel-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11px;
+}
+
+.success-meta-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.success-meta-row .meta-label {
+  font-weight: 800;
+  color: var(--pixel-text-sub);
+  white-space: nowrap;
+  min-width: 52px;
+}
+
+.success-meta-row .meta-val {
+  font-weight: 700;
+  color: var(--pixel-text);
+  word-break: break-all;
+}
+
+.success-meta-row .title-val {
+  color: var(--pixel-text);
+  font-weight: 800;
+}
+
+.success-meta-row .path-val {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  color: #1E6B4A;
+  background: #E8FBF2;
+  padding: 1px 4px;
+  border-radius: 2px;
+  border: 1px solid #1E6B4A;
+}
+
+.success-meta-row .stats-val {
+  font-weight: 800;
+  color: var(--pixel-text-sub);
+}
+
+.success-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.btn-success-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: var(--pixel-bg-card);
+  border: 1.5px solid var(--pixel-border);
+  box-shadow: 1.5px 1.5px 0 var(--pixel-border);
+  border-radius: 4px;
+  padding: 7px 4px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--pixel-text);
+  cursor: pointer;
+  transition: all 0.1s ease;
+  white-space: nowrap;
+}
+
+.btn-success-action:hover {
+  background: var(--pixel-yellow);
+  transform: translate(-1px, -1px);
+  box-shadow: 2.5px 2.5px 0 var(--pixel-border);
+}
+
+.btn-success-action:active {
+  transform: translate(1.5px, 1.5px);
+  box-shadow: 0 0 0 var(--pixel-border);
+}
+
+.btn-success-action.primary {
+  background: var(--pixel-green);
+}
+
+.btn-success-action.primary:hover {
+  background: #5EE2A3;
+}
+
+.btn-success-action.hollow {
+  background: #FFFFFF;
+}
+
 /* 6. 剪藏工作台 (Studio Panel) */
 .studio-card {
   display: flex;

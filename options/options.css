@@ -118,29 +118,33 @@ body {
   border-radius: 3px;
 }
 
-/* 4 大 Tab 切换栏 */
+/* 4 大 Tab 切换栏 (完全平铺展示，无滚动条) */
 .tab-navigation {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  overflow: visible;
 }
 
 .tab-item {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 8px 14px;
+  padding: 9px 8px;
   background: var(--pixel-bg-card);
   border: 2px solid var(--pixel-border);
   border-bottom: none;
   border-top-left-radius: 6px;
   border-top-right-radius: 6px;
   color: var(--pixel-text);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.1s ease;
   user-select: none;
+  white-space: nowrap;
+  text-align: center;
 }
 
 .tab-item:hover {
@@ -151,7 +155,7 @@ body {
   background: var(--pixel-yellow);
   font-weight: 800;
   transform: translateY(2px);
-  padding-bottom: 10px;
+  padding-bottom: 11px;
   box-shadow: none;
 }
 

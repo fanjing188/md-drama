@@ -96,8 +96,29 @@ class FeishuAdapter {
   static normalizeDocxBlocks(container) {
     const doc = document;
 
-    // 1. 清理噪声: 打印占位文案、评论气泡、选区遮罩、光标、侧栏、零宽占位等
+    // 1. 清理噪声: 打印占位文案、AI速读/摘要、评论气泡、选区遮罩、光标、侧栏、零宽占位等
     const removeSelectors = [
+      // 飞书 AI 速读 / AI 摘要 / 智能提炼板块
+      '[data-block-type="ai_digest"]',
+      '[data-block-type="ai_summary"]',
+      '[data-block-type="ai_quick_read"]',
+      '[data-block-type="quick_read"]',
+      '[data-block-type="ai_panel"]',
+      '[data-zone-id*="ai_digest"]',
+      '[data-block-id*="ai_digest"]',
+      '[data-block-id*="ai_summary"]',
+      '.docx-ai-panel',
+      '.docx-ai-quick-read',
+      '.ai-digest-container',
+      '.ai-summary-block',
+      '.suite-ai-summary',
+      '.ai-assistant-wrapper',
+      '.ai-reading-card',
+      '.quick-reading-container',
+      '.ai-overview-block',
+      '.bear-ai-block',
+      '.docx-quick-read-wrapper',
+
       'img.gpf-biz-suite-custom-icon__icon-image',
       '.custom-icon__icon-image img',
       '.bear-virtual-renderUnit-placeholder',
@@ -124,6 +145,14 @@ class FeishuAdapter {
     ];
     removeSelectors.forEach(sel => {
       container.querySelectorAll(sel).forEach(el => el.remove());
+    });
+
+    // 针对包含"AI 速读"/"AI 摘要"标识的横幅与卡片执行二次过滤
+    container.querySelectorAll('.callout-block, .highlight-block, [data-block-type="callout"], .page-banner').forEach(card => {
+      const text = (card.textContent || '').trim();
+      if (/^AI\s*(?:速读|摘要|提炼|总结|简报|阅读助手)/i.test(text)) {
+        card.remove();
+      }
     });
 
     // 2. 文档主标题: 拍平成纯文本 h1
@@ -362,7 +391,10 @@ class FeishuAdapter {
     function harvest() {
       const blocks = Array.from(document.querySelectorAll('[data-block-type]'));
       for (const b of blocks) {
-        if (b.getAttribute('data-block-type') === 'page') continue;
+        const bType = b.getAttribute('data-block-type') || '';
+        if (bType === 'page' || bType.startsWith('ai_') || bType === 'quick_read') continue;
+        if (b.closest && b.closest('.docx-ai-panel, .docx-ai-quick-read, .ai-digest-container, .ai-summary-block')) continue;
+
         const blockId = b.getAttribute('data-block-id') ||
                         b.getAttribute('data-record-id') ||
                         b.id ||

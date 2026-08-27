@@ -45,6 +45,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Obsidian 基础设置
+    if (items.autoSaveDirectly !== undefined) {
+      document.getElementById('autoSaveDirectly').checked = items.autoSaveDirectly;
+    }
     if (items.obsidianSyncMethod) syncMethodSelect.value = items.obsidianSyncMethod;
     if (items.restApiPort) document.getElementById('restApiPort').value = items.restApiPort;
     if (items.restApiToken) document.getElementById('restApiToken').value = items.restApiToken;
@@ -137,8 +140,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       enableSelectionBubble: document.getElementById('enableSelectionBubble').checked,
       selectionSaveMode: selectionSaveModeSelect.value,
       selectionAppendFilePath: document.getElementById('selectionAppendFilePath').value.trim() || '03-知识库/网页剪藏/每日摘录.md',
+      autoSaveDirectly: document.getElementById('autoSaveDirectly').checked,
       obsidianSyncMethod: syncMethodSelect.value,
-      restApiPort: parseInt(document.getElementById('restApiPort').value, 10) || 27124,
+      restApiPort: parseInt(document.getElementById('restApiPort').value, 10) || 27123,
       restApiToken: document.getElementById('restApiToken').value.trim(),
       restApiHttps: document.getElementById('restApiHttps').checked,
       vaultSavePath: document.getElementById('vaultSavePath').value.trim() || '03-知识库/网页剪藏',
