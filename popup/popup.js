@@ -1,4 +1,4 @@
-// popup/popup.js - md抓吗 可爱像素风交互、当前网页信息与抓取历史记录
+// popup/popup.js - MD抓吗 可爱像素风交互、当前网页信息与抓取历史记录
 
 let currentExtractData = null;
 let currentSettings = null;

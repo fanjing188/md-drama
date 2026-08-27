@@ -1,4 +1,4 @@
-// options/options.js - md抓吗 偏好设置管理 (Tab 切换与独立配置)
+// options/options.js - MD抓吗 偏好设置管理 (Tab 切换与独立配置)
 
 document.addEventListener('DOMContentLoaded', async () => {
   const form = document.getElementById('settingsForm');
