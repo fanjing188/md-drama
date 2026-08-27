@@ -72,9 +72,10 @@
     `;
     document.body.appendChild(outlineEl);
 
-    // 2. 渲染像素风交互弹窗 (Pixel Bubble Tooltip)
+    // 2. 渲染像素风交互按钮 (Pixel 抓下来 Button)
     bubbleEl = document.createElement('div');
     bubbleEl.id = 'md-drama-bubble';
+    bubbleEl.title = '把所选文字抓下来';
     bubbleEl.innerHTML = `
       <span class="md-drama-bubble-icon">⚡</span>
       <span class="md-drama-bubble-text">抓下来</span>

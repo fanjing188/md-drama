@@ -58,13 +58,13 @@ chrome.runtime.onInstalled.addListener(() => {
   // 创建右键快捷菜单
   chrome.contextMenus.create({
     id: "md-drama-clip-page",
-    title: "md抓吗：抓取整页至 Obsidian",
+    title: "md抓吗：抓下来 (整页)",
     contexts: ["page"]
   });
 
   chrome.contextMenus.create({
     id: "md-drama-clip-selection",
-    title: "md抓吗：抓取所选文字",
+    title: "md抓吗：抓下来 (所选文字)",
     contexts: ["selection"]
   });
 });
