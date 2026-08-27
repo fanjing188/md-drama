@@ -1,6 +1,8 @@
 // content/adapters/generic.js - 通用站点提取器
 
 class GenericAdapter {
+  static get name() { return 'Generic'; }
+
   static matches(url) {
     return true; // 默认兜底
   }
@@ -52,4 +54,8 @@ class GenericAdapter {
 
 if (typeof window !== 'undefined') {
   window.GenericAdapter = GenericAdapter;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { GenericAdapter };
 }

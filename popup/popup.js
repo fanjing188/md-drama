@@ -215,14 +215,53 @@ function clearError() {
   document.getElementById('errorAlert').classList.add('hidden');
 }
 
+async function ensureContentScripts(tabId) {
+  const scripts = [
+    'utils/logger.js',
+    'utils/sync-queue.js',
+    'lib/turndown.js',
+    'lib/turndown-plugin-gfm.js',
+    'lib/readability.js',
+    'content/cleaner.js',
+    'content/pipeline/transformers.js',
+    'content/pipeline/parser-engine.js',
+    'content/scroller.js',
+    'content/adapters/generic.js',
+    'content/adapters/feishu.js',
+    'content/adapters/shengcai.js',
+    'content/adapters/wechat.js',
+    'content/adapters/zhihu.js',
+    'content/adapters/yuque.js',
+    'content/adapters/notion.js',
+    'content/adapters/juejin.js',
+    'content/extractor.js',
+    'content/ui/bubble.css',
+    'content/ui/bubble.js',
+    'content/index.js'
+  ];
+
+  try {
+    await chrome.scripting.insertCSS({
+      target: { tabId },
+      files: ['content/ui/bubble.css']
+    });
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: scripts.filter(f => f.endsWith('.js'))
+    });
+  } catch (e) {}
+}
+
 // 执行核心剪藏工作流与流水线动态演进
 async function runClipWorkflow(useAutoScroll) {
   clearError();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab || !tab.id || tab.url.startsWith('chrome://')) {
+  if (!tab || !tab.id || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('about:')) {
     displayError('当前系统页面无法提取正文，请在常规网页使用');
     return;
   }
+
+  await ensureContentScripts(tab.id);
 
   const pipeline = document.getElementById('pipelineContainer');
   const studioPanel = document.getElementById('studioPanel');
@@ -331,56 +370,35 @@ async function saveToObsidianStudio() {
   btnSave.innerHTML = `<span>写入中...</span>`;
 
   const finalMarkdown = assembleFinalMarkdown();
-  const folder = currentSettings.vaultSavePath || '03-知识库/网页剪藏';
-  const filename = `${currentExtractData.metadata.title}.md`;
-  const fullPath = `${folder}/${filename}`.replace(/\/+/g, '/');
+  const imgCount = currentExtractData.images?.length || 0;
 
   try {
-    if (currentSettings.obsidianSyncMethod === 'rest_api') {
-      if (currentExtractData.images?.length > 0) {
-        for (const img of currentExtractData.images) {
-          try {
-            const imgPath = `${folder}/${currentSettings.attachmentFolder || 'attachments'}/${img.filename}`.replace(/\/+/g, '/');
-            const imgBase64Res = await chrome.runtime.sendMessage({
-              action: 'fetchImageAsBase64',
-              url: img.originalUrl
-            });
-            if (imgBase64Res.success) {
-              await chrome.runtime.sendMessage({
-                action: 'saveToObsidianRestApi',
-                data: {
-                  path: imgPath,
-                  content: imgBase64Res.dataUrl,
-                  isBinary: true,
-                  settings: currentSettings
-                }
-              });
-            }
-          } catch (e) {}
-        }
-      }
+    // 统一走 service-worker 后端保存：rest_api / downloads 两种模式都会
+    // 先落盘图片附件（attachments/），再写入 Markdown，并应用智能域名分流。
+    // 附带当前标签页 id：后台图片下载失败时可退回页面上下文抓取
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const res = await chrome.runtime.sendMessage({
+      action: 'quickSaveMarkdown',
+      data: { ...currentExtractData, markdown: finalMarkdown },
+      tabId: tab?.id
+    });
 
-      await chrome.runtime.sendMessage({
-        action: 'saveToObsidianRestApi',
-        data: {
-          path: fullPath,
-          content: finalMarkdown,
-          isBinary: false,
-          settings: currentSettings
-        }
-      });
-
-      showFlyoutToast('已秒级同步至 Obsidian！');
-    } else {
-      await chrome.runtime.sendMessage({
-        action: 'downloadFile',
-        data: {
-          filename: `Obsidian_Vault/${fullPath}`,
-          content: finalMarkdown
-        }
-      });
-      showFlyoutToast('Markdown 已导出至本地');
+    if (!res || !res.success) {
+      throw new Error(res?.error || '后端保存失败');
     }
+    const failedCount = res.result?.failedImages?.length || 0;
+
+    let toastText;
+    if (currentSettings.obsidianSyncMethod === 'rest_api') {
+      toastText = `已秒级同步至 Obsidian！${imgCount ? `（含 ${imgCount} 张图片）` : ''}`;
+    } else {
+      toastText = `Markdown 与 ${imgCount} 张图片已导出至下载目录`;
+    }
+    if (failedCount > 0) {
+      // 不让个别防盗链图片拖垮整个归档，但要明确告诉用户哪些没下来
+      toastText += `，⚠ ${failedCount} 张图片下载失败（多为未登录或防盗链）`;
+    }
+    showFlyoutToast(toastText, failedCount === 0);
   } catch (err) {
     displayError(`保存失败: ${err.message}`);
   } finally {

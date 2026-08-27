@@ -9,32 +9,67 @@ class ZhihuAdapter {
 
   static getMetadata() {
     const isArticle = window.location.href.includes('/p/');
+    const isPin = window.location.href.includes('/pin/');
     let title = '';
     let author = '';
 
     if (isArticle) {
-      title = document.querySelector('.Post-Title')?.innerText || document.title;
-      author = document.querySelector('.AuthorInfo-name')?.innerText || '知乎作者';
+      title = (document.querySelector('.Post-Title') || {}).textContent ||
+              document.title;
+      author = (document.querySelector('.AuthorInfo-name') || {}).textContent ||
+               (document.querySelector('.Post-Author .AuthorInfo-name') || {}).textContent ||
+               '';
+    } else if (isPin) {
+      const pinText = (document.querySelector('.PinItem-content, .RichText') || {}).textContent || '';
+      title = pinText.slice(0, 30) || document.title;
+      author = (document.querySelector('.AuthorInfo-name') || {}).textContent || '';
     } else {
-      title = document.querySelector('.QuestionHeader-title')?.innerText || document.title;
-      author = document.querySelector('.AuthorInfo-name')?.innerText || '知乎答主';
+      title = (document.querySelector('.QuestionHeader-title') || {}).textContent ||
+              document.title;
+      author = (document.querySelector('.AuthorInfo-name') || {}).textContent || '';
     }
 
+    const metaDate = document.querySelector('meta[itemprop="datePublished"]') ||
+                     document.querySelector('meta[property="og:article:published_time"]');
+    const date = metaDate ? (metaDate.getAttribute('content') || '') : '';
+
     return {
-      title: (title || '知乎内容').trim().replace(/[/\\?%*:|"<>]/g, '-'),
-      author: author.trim(),
-      date: new Date().toISOString().split('T')[0],
+      title: (title || '知乎内容').trim().replace(/\s*[-_|]\s*知乎\s*$/, '').replace(/[/\\?%*:|"<>]/g, '-'),
+      author: author.trim() || '知乎作者',
+      date: (date || '').trim().slice(0, 10),
       source: window.location.href,
-      tags: ['知乎', isArticle ? '专栏文章' : '问答精华']
+      tags: ['知乎', isArticle ? '专栏文章' : (isPin ? '知乎想法' : '问答精华')]
     };
   }
 
+  // 知乎站内链接清洗:
+  // 1) zhida.zhihu.com/search 知识卡片自动链 -> 只保留文字
+  // 2) link.zhihu.com/?target=... 跳转链 -> 还原真实目标地址
+  static normalizeZhihuLinks(container) {
+    container.querySelectorAll('a[href]').forEach(a => {
+      const href = a.getAttribute('href') || '';
+      if (/zhida\.zhihu\.com\/search/.test(href)) {
+        const text = document.createTextNode(a.textContent || '');
+        a.parentNode.replaceChild(text, a);
+        return;
+      }
+      const redirectMatch = href.match(/link\.zhihu\.com\/\?target=([^&]+)/);
+      if (redirectMatch) {
+        try {
+          a.setAttribute('href', decodeURIComponent(redirectMatch[1]));
+        } catch (e) { /* 保留原链接 */ }
+      }
+    });
+  }
+
   static extractContent() {
-    // 专栏正文或回答正文
-    const mainEl = document.querySelector('.Post-RichTextContainer') || 
+    // 专栏正文、回答正文或想法
+    const mainEl = document.querySelector('.Post-RichTextContainer') ||
                    document.querySelector('.RichContent-inner') ||
-                   document.querySelector('.QuestionAnswer-content');
-    
+                   document.querySelector('.QuestionAnswer-content') ||
+                   document.querySelector('.Post-RichText') ||
+                   document.querySelector('.PinItem-content');
+
     if (!mainEl) return GenericAdapter.extractContent();
 
     const container = mainEl.cloneNode(true);
@@ -46,18 +81,28 @@ class ZhihuAdapter {
       '.AuthorInfo',
       '.LinkCard',
       '.ZhihuCard',
-      '.Recommendations-Main'
+      '.Recommendations-Main',
+      '.ConsultHint',
+      '.KfeCollection-PcStick'
     ];
     noiseSelectors.forEach(sel => container.querySelectorAll(sel).forEach(el => el.remove()));
 
+    // 知乎站内链接规范化
+    ZhihuAdapter.normalizeZhihuLinks(container);
+
     // 修复知乎真实图片地址 (data-actualsrc / data-original)
     container.querySelectorAll('img').forEach(img => {
-      const realSrc = img.getAttribute('data-actualsrc') || 
-                     img.getAttribute('data-original') || 
-                     img.getAttribute('data-rawsrc') || 
-                     img.src;
+      const realSrc = img.getAttribute('data-actualsrc') ||
+                      img.getAttribute('data-original') ||
+                      img.getAttribute('data-rawsrc') ||
+                      img.src;
       if (realSrc) {
         img.setAttribute('src', realSrc);
+      }
+      // 过滤知乎头像与情绪图标
+      const src = img.getAttribute('src') || '';
+      if (/people\/.*_isize|\.svg$/i.test(src) && !/equation/.test(src)) {
+        img.remove();
       }
     });
 
@@ -77,4 +122,8 @@ class ZhihuAdapter {
 
 if (typeof window !== 'undefined') {
   window.ZhihuAdapter = ZhihuAdapter;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { ZhihuAdapter };
 }

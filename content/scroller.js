@@ -17,6 +17,7 @@ class SmartScroller {
     const customSelectors = [
       '.bear-web-editor',          // 飞书文档
       '.docx-editor',             // 飞书新版 Docx
+      '.bear-web-x-container',    // 飞书 wiki 新版页面主体
       '.doc-page-container',      // 飞书页面容器
       '.topic-list',              // 生财有术 / 知识星球
       '.topic-detail',            // 知识星球长贴
@@ -41,7 +42,7 @@ class SmartScroller {
 
     for (const el of allDivs) {
       const style = window.getComputedStyle(el);
-      const isScrollable = (style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 100;
+      const isScrollable = (style.overflowY === 'auto' || style.overflowY === 'scroll' || style.overflowY === 'overlay') && el.scrollHeight > el.clientHeight + 100;
       if (isScrollable && el.scrollHeight > maxScrollHeight) {
         maxScrollHeight = el.scrollHeight;
         bestContainer = el;

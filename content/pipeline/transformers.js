@@ -243,6 +243,46 @@ class TransformersRegistry {
         }
       }
     });
+
+    // 8. 块级子元素链接拍平: <a> 内含 div/p 等块级结构时 (Notion 卡片链接等),
+    //    用纯文本替换, 避免生成跨行断裂的 Markdown 链接
+    this.register({
+      name: 'block-link-flattener',
+      match: (node) => {
+        if (node.tagName !== 'A') return false;
+        return !!node.querySelector('div, p, h1, h2, h3, h4, h5, h6, li, table');
+      },
+      transform: (node) => {
+        const text = (node.textContent || '').replace(/\s+/g, ' ').trim();
+        while (node.firstChild) node.removeChild(node.firstChild);
+        node.appendChild(document.createTextNode(text));
+      }
+    });
+
+    // 9. 相对地址绝对化: a[href] 与 img 的相对地址转为绝对 URL,
+    //    保证剪藏后的 Markdown 链接/图片在任何位置都能访问
+    this.register({
+      name: 'relative-url-absolutizer',
+      match: (node) => {
+        if (node.tagName === 'A') {
+          const href = node.getAttribute('href');
+          return !!href && !/^(https?:|mailto:|tel:|data:|#|javascript:)/i.test(href);
+        }
+        if (node.tagName === 'IMG') {
+          const src = node.getAttribute('src');
+          return !!src && !/^(https?:|data:)/i.test(src);
+        }
+        return false;
+      },
+      transform: (node) => {
+        try {
+          const attr = node.tagName === 'A' ? 'href' : 'src';
+          const base = (typeof location !== 'undefined' && location.href) ? location.href : undefined;
+          if (!base) return;
+          node.setAttribute(attr, new URL(node.getAttribute(attr), base).href);
+        } catch (e) { /* 无效地址跳过 */ }
+      }
+    });
   }
 
   apply(root) {

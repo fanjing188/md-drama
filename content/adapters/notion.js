@@ -8,10 +8,12 @@ class NotionAdapter {
   }
 
   static getMetadata() {
-    const titleEl = document.querySelector('.notion-page-block > h1') || 
+    const titleEl = document.querySelector('.notion-page-block > h1') ||
                     document.querySelector('.notion-title') ||
-                    document.querySelector('h1.notion-header__title');
-    const title = titleEl ? titleEl.innerText : document.title;
+                    document.querySelector('h1.notion-header__title') ||
+                    document.querySelector('.notion-page-content h1') ||
+                    document.querySelector('h1');
+    const title = (titleEl ? (titleEl.textContent || '').trim() : '') || document.title;
 
     return {
       title: (title || 'Notion Page').trim().replace(/[/\\?%*:|"<>]/g, '-'),
@@ -25,7 +27,8 @@ class NotionAdapter {
   static extractContent() {
     const mainEl = document.querySelector('.notion-page-content') || 
                    document.querySelector('.notion-scroller') ||
-                   document.querySelector('.notion-page-view');
+                   document.querySelector('.notion-page-view') ||
+                   document.querySelector('.notion-frame');
     
     if (!mainEl) return GenericAdapter.extractContent();
 
@@ -36,13 +39,14 @@ class NotionAdapter {
       '.notion-topbar',
       '.notion-help-button',
       '.notion-cursor-listener',
-      '.notion-page-controls'
+      '.notion-page-controls',
+      '.notion-sidebar'
     ];
     noiseSelectors.forEach(sel => container.querySelectorAll(sel).forEach(el => el.remove()));
 
-    // Notion 图片通常放在 source 或 src
+    // Notion 图片
     container.querySelectorAll('img').forEach(img => {
-      const realSrc = img.getAttribute('src');
+      const realSrc = img.getAttribute('src') || img.getAttribute('data-src');
       if (realSrc) {
         img.setAttribute('src', realSrc);
       }
@@ -61,4 +65,8 @@ class NotionAdapter {
 
 if (typeof window !== 'undefined') {
   window.NotionAdapter = NotionAdapter;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { NotionAdapter };
 }

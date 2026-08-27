@@ -112,11 +112,15 @@ async function executeSilentClip(tab) {
     });
 
     if (res && res.success) {
-      await saveToObsidianBackend(res.data, tab.url, settings);
+      const result = await saveToObsidianBackend(res.data, tab.url, settings, tab.id);
+      let msg = '✓ 已成功归档至 Obsidian';
+      if (result?.failedImages?.length) {
+        msg += `（${result.failedImages.length} 张图片下载失败，多为未登录或防盗链所致）`;
+      }
       chrome.tabs.sendMessage(tab.id, {
         action: 'showToast',
-        message: `✓ 已成功归档至 Obsidian`,
-        type: 'success'
+        message: msg,
+        type: result?.failedImages?.length ? 'info' : 'success'
       }).catch(() => {});
     } else {
       throw new Error(res?.error || '提取失败');
@@ -138,7 +142,9 @@ async function getSettings() {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'quickSaveMarkdown') {
     getSettings().then(settings => {
-      saveToObsidianBackend(request.data, sender.tab?.url || '', settings)
+      // popup 发来的消息没有 sender.tab，优先用文档元数据里的来源 URL 做智能分流
+      const pageUrl = request.data?.metadata?.source || sender.tab?.url || '';
+      saveToObsidianBackend(request.data, pageUrl, settings, request.tabId ?? sender.tab?.id)
         .then(res => sendResponse({ success: true, result: res }))
         .catch(err => sendResponse({ success: false, error: err.message }));
     });
@@ -167,11 +173,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// 后台统一下载/REST API写入
-async function saveToObsidianBackend(extractData, url, settings) {
+// 后台统一下载/REST API写入。返回值附带 failedImages 汇总，供前端明确提示用户。
+async function saveToObsidianBackend(extractData, url, settings, tabId) {
   const targetFolder = getTargetFolder(url, settings);
   const filename = `${extractData.metadata.title}.md`;
   const fullPath = `${targetFolder}/${filename}`.replace(/\/+/g, '/');
+  const failedImages = [];
 
   if (settings.obsidianSyncMethod === 'rest_api') {
     // 1. 静默并发下载所有图片并保存至 Obsidian 附件目录
@@ -179,92 +186,195 @@ async function saveToObsidianBackend(extractData, url, settings) {
       for (const img of extractData.images) {
         try {
           const imgPath = `${targetFolder}/${settings.attachmentFolder || 'attachments'}/${img.filename}`.replace(/\/+/g, '/');
-          const imgBase64 = await fetchImageAsBase64(img.originalUrl);
+          const imgBase64 = await fetchImageAsBase64(img.originalUrl, tabId);
           await saveToObsidianRestApi({
             path: imgPath,
-            content: imgBase64,
+            content: dataUrlToBytes(imgBase64),
             isBinary: true,
             settings: settings
           });
         } catch (e) {
           console.warn('图片附件保存跳过:', img.filename, e);
+          failedImages.push(img.filename);
         }
       }
     }
 
     // 2. 保存 Markdown 文件
-    return await saveToObsidianRestApi({
+    await saveToObsidianRestApi({
       path: fullPath,
       content: extractData.markdown,
       isBinary: false,
       settings: settings
     });
+    return { path: fullPath, savedImages: (extractData.images?.length || 0) - failedImages.length, failedImages };
   } else {
     // 导出文件模式：同时下载 Markdown 和图片包
     if (settings.imageHandling === 'download' && extractData.images?.length > 0) {
       for (const img of extractData.images) {
+        const imgPath = `Obsidian_Vault/${targetFolder}/${settings.attachmentFolder || 'attachments'}/${img.filename}`.replace(/\/+/g, '/');
         try {
-          const imgPath = `Obsidian_Vault/${targetFolder}/${settings.attachmentFolder || 'attachments'}/${img.filename}`.replace(/\/+/g, '/');
-          const imgBase64 = await fetchImageAsBase64(img.originalUrl);
+          const imgBase64 = await fetchImageAsBase64(img.originalUrl, tabId);
           await handleDownload({
             filename: imgPath,
             content: imgBase64,
             isDataUrl: true
           });
         } catch (e) {
-          console.warn('本地图片下载失败:', img.filename);
+          // fetch 被拦截时退回浏览器原生下载通道（chrome.downloads 走浏览器网络栈，自带站点 Cookie）
+          try {
+            await handleDownload({
+              filename: imgPath,
+              content: img.originalUrl,
+              isDataUrl: true
+            });
+          } catch (e2) {
+            console.warn('本地图片下载失败:', img.filename, e2);
+            failedImages.push(img.filename);
+          }
         }
       }
     }
 
-    return await handleDownload({
+    // Markdown 允许命名降级兜底，保证保存永不因文件名问题整体失败
+    await handleDownload({
       filename: `Obsidian_Vault/${fullPath}`,
-      content: extractData.markdown
+      content: extractData.markdown,
+      allowNameFallback: true
     });
+    return { path: fullPath, savedImages: (extractData.images?.length || 0) - failedImages.length, failedImages };
   }
 }
 
-async function handleDownload({ filename, content, mimeType = 'text/markdown;charset=utf-8', isDataUrl = false }) {
-  if (isDataUrl) {
-    return new Promise((resolve, reject) => {
-      chrome.downloads.download({
-        url: content,
-        filename: filename,
-        saveAs: false,
-        conflictAction: 'uniquify'
-      }, (downloadId) => {
-        if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
-        else resolve({ downloadId });
+// chrome.downloads 对文件名有平台级校验（非法字符 / NUL / 路径穿越等会直接抛 Invalid filename）。
+// 飞书等编辑器的文本埋有大量肉眼不可见的字符：零宽连接符、BOM、数学不可见运算符(U+2061..2064)、
+// 方向控制符(U+202A..202E)、交互注释符(U+FFF9..FFFB)、软连字符等。\p{Cf} 是 Unicode 全部
+// Format 类别的并集，一次性覆盖以上所有；再补充行分隔符 Zl/Zp 与零宽空格。
+function INVISIBLE_CHARS() {
+  return /[\p{Cf}\u2028\u2029\u200B]/gu;
+}
+
+function sanitizePathSegment(seg) {
+  return String(seg)
+    .replace(INVISIBLE_CHARS(), '')                          // 不可见格式化字符
+    .replace(/[\u0000-\u001F\u007F]/g, '')                   // 控制字符（含换行）
+    .replace(/[\\/:*?"<>|]/g, '-')                           // Windows/macOS 非法字符
+    .replace(/^[\s.]+/, '')                                  // 段首的点与空白（隐藏文件 / 目录穿越）
+    .replace(/[\s.]+$/, '')                                  // 段尾的点与空白
+    .trim();
+}
+
+function sanitizeRelativePath(p) {
+  const segs = String(p).split('/')
+    .map(sanitizePathSegment)
+    .filter(s => s && s !== '.' && s !== '..');
+  return segs.join('/') || 'untitled.md';
+}
+
+// dataURL 过大时 chrome.downloads 会因 URL 长度限制而失败，超过阈值改走 Blob URL
+const BLOB_URL_THRESHOLD = 1_500_000;
+
+// 构造候选下载源：Blob URL 优先（无长度限制），dataURL 作为独立通道兜底。
+// 返回 { urls, created }，created 是需要延迟释放的 ObjectURL 列表。
+async function buildCandidateUrls(content, mimeType, isDataUrl) {
+  const urls = [];
+  const created = [];
+
+  if (!isDataUrl) {
+    try {
+      const objectUrl = URL.createObjectURL(new Blob([content], { type: mimeType }));
+      created.push(objectUrl);
+      urls.push(objectUrl);
+    } catch (e) { /* Blob 构造失败则仅尝试 dataURL */ }
+
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('dataURL 构造失败'));
+        reader.readAsDataURL(new Blob([content], { type: mimeType }));
       });
-    });
+      urls.push(dataUrl);
+    } catch (e) { /* 已有 Blob 通道时忽略 */ }
+  } else if (typeof content === 'string') {
+    if (content.startsWith('data:')) urls.push(content);
+    if (content.startsWith('data:') && content.length > BLOB_URL_THRESHOLD ||
+        !content.startsWith('data:') && content.startsWith('blob:')) {
+      try {
+        const res = await fetch(content);
+        const objectUrl = URL.createObjectURL(await res.blob());
+        created.push(objectUrl);
+        urls.unshift(objectUrl);
+      } catch (e) { /* 保留原通道 */ }
+    }
   }
 
-  const blob = new Blob([content], { type: mimeType });
-  const reader = new FileReader();
+  return { urls, created };
+}
 
+function rawDownload(url, filename) {
   return new Promise((resolve, reject) => {
-    reader.onloadend = () => {
-      chrome.downloads.download({
-        url: reader.result,
-        filename: filename,
-        saveAs: false,
-        conflictAction: 'uniquify'
-      }, (downloadId) => {
-        if (chrome.runtime.lastError) {
-          reject(chrome.runtime.lastError);
-        } else {
-          resolve({ downloadId });
-        }
-      });
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
+    chrome.downloads.download({
+      url,
+      filename,
+      saveAs: false,
+      conflictAction: 'uniquify'
+    }, (downloadId) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        resolve({ downloadId });
+      }
+    });
   });
+}
+
+async function handleDownload({ filename, content, mimeType = 'text/markdown;charset=utf-8', isDataUrl = false, allowNameFallback = false }) {
+  const safeFilename = sanitizeRelativePath(filename);
+  if (!safeFilename) {
+    throw new Error(`Invalid filename (消毒后为空): ${JSON.stringify(String(filename).slice(0, 80))}`);
+  }
+
+  const { urls: candidateUrls, created } = await buildCandidateUrls(content, mimeType, isDataUrl);
+  if (!candidateUrls.length) {
+    throw new Error(`无法构造下载源 (文件: ${safeFilename})`);
+  }
+
+  // 文件名候选：
+  // - Markdown(allowNameFallback) 允许降级为根目录纯 ASCII 时间戳名，保证保存永不因命名被阻断；
+  //   注意图片附件绝不能改名 —— 笔记内 ![](attachments/xxx.png) 的引用必须与磁盘文件名严格一致
+  const nameCandidates = [safeFilename];
+  if (allowNameFallback) {
+    const extMatch = safeFilename.match(/\.([A-Za-z0-9]+)$/);
+    nameCandidates.push(`md-drama-${Date.now()}.${extMatch ? extMatch[1] : 'txt'}`);
+  }
+
+  let lastErr;
+  try {
+    for (const fname of nameCandidates) {
+      for (const url of candidateUrls) {
+        try {
+          return await rawDownload(url, fname);
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+    }
+  } finally {
+    // 延迟释放：给下载器留出读取 Blob 的时间
+    setTimeout(() => {
+      created.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) {} });
+    }, 30_000);
+  }
+
+  const namesTried = nameCandidates.join(', ');
+  throw new Error(`${lastErr ? lastErr.message : '下载失败'} (文件: ${namesTried})`);
 }
 
 async function saveToObsidianRestApi({ path, content, isBinary, settings }) {
   const protocol = settings.restApiHttps ? 'https' : 'http';
-  const url = `${protocol}://127.0.0.1:${settings.restApiPort}/vault/${encodeURIComponent(path)}`;
+  const safePath = sanitizeRelativePath(path);
+  const url = `${protocol}://127.0.0.1:${settings.restApiPort}/vault/${encodeURIComponent(safePath)}`;
 
   let bodyData = content;
   let headers = {
@@ -286,16 +396,59 @@ async function saveToObsidianRestApi({ path, content, isBinary, settings }) {
   return { status: response.status };
 }
 
-async function fetchImageAsBase64(url) {
-  const response = await fetch(url, { mode: 'cors', credentials: 'omit' });
-  if (!response.ok) throw new Error(`图片下载失败: ${response.status}`);
-  const blob = await response.blob();
+function blobToDataUrl(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(reader.result);
-    reader.onerror = reject;
+    reader.onerror = () => reject(new Error('图片数据读取失败'));
     reader.readAsDataURL(blob);
   });
+}
+
+// dataURL -> Uint8Array。Obsidian Local REST API 的二进制写入要求原始字节流，
+// 直接把 dataURL 字符串当 body PUT 进去会存出损坏的图片文件。
+function dataUrlToBytes(dataUrl) {
+  const base64 = String(dataUrl).split(',')[1] || '';
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+async function fetchImageAsBase64(url, tabId, timeoutMs = 20000) {
+  const attemptWithTimeout = async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      // 带上站点 Cookie：飞书/知乎等平台的图片 CDN 链接(internal-api-drive-stream 等)
+      // 需要登录态鉴权，credentials: 'omit' 会直接 401 导致图片静默丢失
+      const response = await fetch(url, { mode: 'cors', credentials: 'include', signal: controller.signal });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      if (!blob.size) throw new Error('响应内容为空');
+      if (blob.type && /text\/html/i.test(blob.type)) throw new Error('CDN 返回了网页而非图片');
+      return await blobToDataUrl(blob);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  try {
+    return await attemptWithTimeout();
+  } catch (bgErr) {
+    // 背景 fetch 失败（缺 Referer 被防盗链拦截、超时等）时退回页面上下文抓取：
+    // 与页面同源、同 Cookie、带自然 Referer，且可从页面里已加载成功的 <img> 直接取像素
+    if (tabId !== undefined && tabId !== null) {
+      try {
+        const res = await chrome.tabs.sendMessage(tabId, { action: 'fetchImageAsBase64', url });
+        if (res?.success && res.dataUrl) return res.dataUrl;
+        throw new Error(res?.error || '页面内抓取无返回');
+      } catch (pageErr) {
+        throw new Error(`图片下载失败 [后台:${bgErr.message} / 页面:${pageErr.message}]`);
+      }
+    }
+    throw new Error(`图片下载失败: ${bgErr.message}`);
+  }
 }
 
 async function ensureContentScripts(tabId) {

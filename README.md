@@ -91,5 +91,25 @@ md-drama/
 ├── options/                      # 偏好设置页
 ├── test/                         # 自动化单元测试套件
 └── dist/
-    └── md-drama-v1.1.0.zip       # 最新构建发布包
+    └── md-drama-v1.2.0.zip       # 最新构建发布包
 ```
+
+---
+
+## 🔄 版本更新日志 (Changelog)
+
+### v1.2.0 (2026-08)
+- 🚀 **飞书/Lark Docx 虚拟列表动态收割引擎**：针对飞书动态卸载视口外 DOM 的机制，设计渐进式步进收割算法（`harvestAllBlocks`），支持无上限超长文档 100% 完整解析；
+- 🖼️ **飞书图片永久流地址直解**：直接根据 `image-token` 与 `data-record-id` 构建永久授权 Drive Stream CDN 链接，彻底消除临时 `blob:` URL 过期销毁导致的批量下载失败；
+- 📐 **Markdown 排版与格式一致性全面升级**：
+  - 规范化标题层级（主标题入 Frontmatter，文内标题严格阶梯化，前后自动补齐 `\n\n` 空行）；
+  - 修复 Turndown 异常破折号转义（`\-` -> `-`），压缩无序列表前缀空格为标准 GFM `- item`；
+  - 修复图片独立段落与分界线分隔规范；
+- 🛡️ **全渠道专有适配器深度加固与测试**：全面升级并测试微信公众号、知乎（专栏/回答/想法）、语雀知识库、Notion、稀土掘金、生财有术/知识星球、通用 Readability 引擎；
+- 🛠️ **修复登录墙误判**：仅在提取正文极短（< 600字）且存在拦截层时告警，避免正常长文误报。
+
+### v1.1.0 (2026-08)
+- 首次发布 6 阶段通用流水线引擎（Transformers + Content Cleaner + Parser Engine）；
+- 支持 Mermaid、Diff、KaTeX 公式与伪表格重构；
+- 支持 Obsidian Local REST API 静默直连与智能域名分流。
+

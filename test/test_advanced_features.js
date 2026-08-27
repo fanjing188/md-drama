@@ -55,7 +55,8 @@ async function testAdvanced() {
 
   // 断言
   if (!result.markdown.includes('```mermaid\ngraph TD;')) throw new Error('Mermaid 原生还原失败');
-  if (!result.markdown.includes('```diff') || !result.markdown.includes('- 旧的解析逻辑') || !result.markdown.includes('+ 新的 6 阶段流水线引擎')) {
+  // 注意：代码块内容必须 1:1 保留，盘古排版不得在代码块内插空格
+  if (!result.markdown.includes('```diff') || !result.markdown.includes('- 旧的解析逻辑') || !result.markdown.includes('+ 新的6阶段流水线引擎')) {
     throw new Error('代码 Diff 差异还原失败');
   }
   if (!result.markdown.includes('[[出海]]') || !result.markdown.includes('[[SEO]]') || !result.markdown.includes('[[Obsidian]]')) {

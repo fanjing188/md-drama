@@ -1,2 +1,5 @@
 node_modules/
 .DS_Store
+test_results/
+raw_html/
+dist/md-drama-v1.*/

@@ -134,7 +134,66 @@ async function testAdapters() {
     console.log("✓ 掘金技术博客适配器测试通过");
   }
 
-  // 6. 测试通用兜底 (Generic Fallback)
+  // 6. 测试飞书/Lark Docx 文档
+  {
+    const html = `
+      <div class="docx-title-text">飞书自动化实战指南</div>
+      <div class="docx-page-block" data-block-type="page">
+        <div class="block docx-heading1-block" data-block-type="heading1" data-block-id="1">
+          <div class="ace-line">一、出海实战核心策略</div>
+        </div>
+        <div class="block docx-text-block" data-block-type="text" data-block-id="2">
+          <div class="ace-line">这是飞书文档正文核心段落，详细讲解全自动化建站流程。</div>
+        </div>
+        <div class="block docx-callout-block" data-block-type="callout" data-block-id="3">
+          <div class="callout-block-children">
+            <p>关键注意事项：需要配置好域名解析与 GSC 监控。</p>
+          </div>
+        </div>
+        <div class="block docx-image-block" data-block-type="image" data-block-id="4">
+          <div class="gpf-biz-action-manager-forbidden-placeholder">附件不支持打印</div>
+          <img src="https://internal-api-drive-stream.feishu.cn/space/api/box/stream/download/v2/cover/test-token/" alt="飞书文档 - 配图" />
+        </div>
+      </div>
+    `;
+    const win = createEnv(html, "https://sample.feishu.cn/wiki/test12345");
+    const extractor = new win.DramaExtractor();
+    const res = await extractor.extract();
+    if (!res.markdown.includes('一、出海实战核心策略')) throw new Error('飞书标题提取失败');
+    if (!res.markdown.includes('这是飞书文档正文核心段落，详细讲解全自动化建站流程。')) throw new Error('飞书正文段落提取失败');
+    if (!res.markdown.includes('[!NOTE]')) throw new Error('飞书 Callout 提取失败');
+    if (res.markdown.includes('附件不支持打印')) throw new Error('飞书打印占位噪声未清洗');
+    if (res.images.length === 0) throw new Error('飞书图片未提取');
+    console.log("✓ 飞书文档适配器测试通过");
+  }
+
+  // 7. 测试生财有术 / 知识星球
+  {
+    const html = `
+      <div class="topic-title">生财有术实战大航海复盘</div>
+      <div class="author-name">亦仁</div>
+      <div class="time">2026-08-20</div>
+      <div class="topic-detail">
+        <div class="topic-text">
+          <p>这是生财有术社群核心精华帖，分享流量出海底层逻辑。</p>
+          <img data-origin-src="https://images.zsxq.com/highres123.png" alt="社群配图" />
+        </div>
+        <div class="comment-item">
+          <span class="commenter-name">圈友老王</span>
+          <div class="comment-text">写得太透彻了，学习了！</div>
+        </div>
+      </div>
+    `;
+    const win = createEnv(html, "https://articles.zsxq.com/id_123456");
+    const extractor = new win.DramaExtractor();
+    const res = await extractor.extract();
+    if (!res.markdown.includes('生财有术社群核心精华帖')) throw new Error('生财正文提取失败');
+    if (!res.markdown.includes('圈友老王') || !res.markdown.includes('写得太透彻了')) throw new Error('生财评论区提取失败');
+    if (res.images.length === 0) throw new Error('生财图片未解析');
+    console.log("✓ 生财有术/知识星球适配器测试通过");
+  }
+
+  // 8. 测试通用兜底 (Generic Fallback)
   {
     const html = `
       <html>
