@@ -1,10 +1,10 @@
-// background/service-worker.js - 快捷键、右键菜单、历史记录与 Obsidian Local REST API 直连
+// background/service-worker.js - 快捷键、右键菜单、历史记录与 Obsidian Local REST API 智能直连
 
 const DEFAULT_SETTINGS = {
   obsidianSyncMethod: 'downloads', // 'rest_api' | 'downloads'
-  restApiPort: 27124,
+  restApiPort: 27123,              // 默认推荐 HTTP 27123 端口（免自签名证书限制）
   restApiToken: '',
-  restApiHttps: true,
+  restApiHttps: false,             // 默认推荐使用标准 HTTP 协议
   vaultName: 'fanjing_notes',
   vaultSavePath: '03-知识库/网页剪藏',
   attachmentFolder: 'attachments',
@@ -176,6 +176,26 @@ async function getSettings() {
   return new Promise(resolve => chrome.storage.sync.get(null, resolve));
 }
 
+// 构造候选服务器端点列表 (支持 HTTPS、HTTP 与常用 27123/27124 智能回退)
+function getApiEndpointCandidates(settings, subPath = '') {
+  const port = parseInt(settings.restApiPort, 10) || 27124;
+  const pathPart = subPath ? (subPath.startsWith('/') ? subPath : `/${subPath}`) : '';
+  const candidates = [];
+
+  const mainProtocol = settings.restApiHttps ? 'https' : 'http';
+  candidates.push(`${mainProtocol}://127.0.0.1:${port}${pathPart}`);
+
+  // 备用 HTTP 端口与协议
+  if (mainProtocol === 'https') {
+    candidates.push(`http://127.0.0.1:${port}${pathPart}`);
+    if (port === 27124) candidates.push(`http://127.0.0.1:27123${pathPart}`);
+  } else {
+    if (port === 27123) candidates.push(`http://127.0.0.1:27124${pathPart}`);
+  }
+
+  return [...new Set(candidates)];
+}
+
 // 消息路由
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'quickSaveMarkdown') {
@@ -213,7 +233,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  // 测试与检查 Obsidian REST API 连通性
+  // 测试与检查 Obsidian REST API 连通性 (带智能多端点探测)
   if (request.action === 'checkObsidianConnection' || request.action === 'testObsidianRestApi') {
     const config = request.config || null;
     getSettings().then(async (settings) => {
@@ -226,46 +246,47 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return sendResponse({ success: false, connected: false, message: '请先填写 REST API Token' });
       }
 
-      const port = cfg.restApiPort || 27124;
       const headers = { 'Authorization': `Bearer ${cfg.restApiToken}` };
-      const protocol = cfg.restApiHttps ? 'https' : 'http';
+      const endpoints = getApiEndpointCandidates(cfg, '/');
 
-      try {
-        const res = await fetch(`${protocol}://127.0.0.1:${port}/`, {
-          method: 'GET',
-          headers: headers
-        });
-
-        if (res.ok) {
-          const json = await res.json().catch(() => ({}));
-          return sendResponse({ success: true, connected: true, protocol, port, data: json, message: '✓ 已成功连接到 Obsidian Local REST API！' });
-        } else if (res.status === 401) {
-          return sendResponse({ success: false, connected: false, message: 'API Token 验证失败 (401 Unauthorized)，请检查 API Key' });
-        } else {
-          return sendResponse({ success: false, connected: false, message: `Obsidian 响应异常 [HTTP ${res.status}]` });
-        }
-      } catch (err) {
-        // 若配置了 HTTPS 但失败，尝试自动探测 HTTP 端口
-        if (cfg.restApiHttps) {
-          try {
-            const httpRes = await fetch(`http://127.0.0.1:${port}/`, { method: 'GET', headers: headers });
-            if (httpRes.ok) {
-              return sendResponse({
-                success: true,
-                connected: true,
-                protocol: 'http',
-                port,
-                message: '✓ 检测到 Obsidian 当前使用 HTTP 协议，请在设置中关闭 HTTPS 选项'
-              });
+      let lastErrorMsg = '';
+      for (const ep of endpoints) {
+        try {
+          const res = await fetch(ep, { method: 'GET', headers: headers });
+          if (res.ok) {
+            const json = await res.json().catch(() => ({}));
+            const isHttp = ep.startsWith('http://');
+            const portMatch = ep.match(/:(\d+)/);
+            const activePort = portMatch ? portMatch[1] : '27123';
+            
+            let tip = `✓ 成功连接到 Obsidian Local REST API (端点: ${ep.replace(/\/$/, '')})`;
+            if (cfg.restApiHttps && isHttp) {
+              tip += '，已为您自动适配 HTTP 通道！';
             }
-          } catch (e2) {}
+            return sendResponse({
+              success: true,
+              connected: true,
+              protocol: isHttp ? 'http' : 'https',
+              port: activePort,
+              endpoint: ep,
+              data: json,
+              message: tip
+            });
+          } else if (res.status === 401) {
+            return sendResponse({ success: false, connected: false, message: 'API Token 验证失败 (401 Unauthorized)，请检查 API Key' });
+          } else {
+            lastErrorMsg = `Obsidian 响应异常 [HTTP ${res.status}]`;
+          }
+        } catch (e) {
+          lastErrorMsg = e.message;
         }
-        return sendResponse({
-          success: false,
-          connected: false,
-          message: `无法连接到 127.0.0.1:${port}。请确保：1. Obsidian 已打开；2. Local REST API 插件已启用；3. 端口正确`
-        });
       }
+
+      return sendResponse({
+        success: false,
+        connected: false,
+        message: `无法连接到 Obsidian Local REST API。请确保：1. Obsidian 已打开；2. Local REST API 插件处于开启状态；3. 推荐在设置中使用 HTTP 协议与 27123 端口`
+      });
     });
     return true;
   }
@@ -299,26 +320,19 @@ async function saveToObsidianBackend(extractData, url, settings, tabId, isSelect
         try {
           const safePath = sanitizeRelativePath(fullPath);
           const encodedPath = safePath.split('/').map(encodeURIComponent).join('/');
-          const protocol = settings.restApiHttps ? 'https' : 'http';
-          const readUrl = `${protocol}://127.0.0.1:${settings.restApiPort}/vault/${encodedPath}`;
-          
-          let readRes;
-          try {
-            readRes = await fetch(readUrl, {
-              method: 'GET',
-              headers: { 'Authorization': `Bearer ${settings.restApiToken}` }
-            });
-          } catch(e) {
-            // HTTPS 证书回退 HTTP
-            if (settings.restApiHttps) {
-              readRes = await fetch(`http://127.0.0.1:${settings.restApiPort}/vault/${encodedPath}`, {
+          const endpoints = getApiEndpointCandidates(settings, `/vault/${encodedPath}`);
+
+          for (const ep of endpoints) {
+            try {
+              const readRes = await fetch(ep, {
                 method: 'GET',
                 headers: { 'Authorization': `Bearer ${settings.restApiToken}` }
               });
-            }
-          }
-          if (readRes && readRes.ok) {
-            currentContent = await readRes.text();
+              if (readRes.ok) {
+                currentContent = await readRes.text();
+                break;
+              }
+            } catch(e) {}
           }
         } catch(e) {}
 
@@ -550,7 +564,7 @@ async function handleDownload({ filename, content, mimeType = 'text/markdown;cha
   throw new Error(`${lastErr ? lastErr.message : '下载失败'} (文件: ${safeFilename})`);
 }
 
-// 核心 Obsidian Local REST API 写入器 (精确逐级路径转义 + 协议自适应回退 + 诊断信息)
+// 核心 Obsidian Local REST API 写入器 (精确逐级路径转义 + 智能多候选端点自适应)
 async function saveToObsidianRestApi({ path, content, isBinary, settings }) {
   if (!settings.restApiToken) {
     throw new Error('未配置 Obsidian REST API Token，请先前往插件设置中填写 API Key');
@@ -559,49 +573,36 @@ async function saveToObsidianRestApi({ path, content, isBinary, settings }) {
   const safePath = sanitizeRelativePath(path);
   // 精确逐级转义路径段，保留斜杠 / 以正确创建多层级目录
   const encodedPath = safePath.split('/').map(encodeURIComponent).join('/');
-  const port = settings.restApiPort || 27124;
-  const protocol = settings.restApiHttps ? 'https' : 'http';
-  const primaryUrl = `${protocol}://127.0.0.1:${port}/vault/${encodedPath}`;
+  const endpoints = getApiEndpointCandidates(settings, `/vault/${encodedPath}`);
 
   const headers = {
     'Authorization': `Bearer ${settings.restApiToken}`,
     'Content-Type': isBinary ? 'application/octet-stream' : 'text/markdown; charset=utf-8'
   };
 
-  const doFetch = async (targetUrl) => {
-    return await fetch(targetUrl, {
-      method: 'PUT',
-      headers: headers,
-      body: content
-    });
-  };
+  let lastErr = null;
+  for (const targetUrl of endpoints) {
+    try {
+      const response = await fetch(targetUrl, {
+        method: 'PUT',
+        headers: headers,
+        body: content
+      });
 
-  let response;
-  try {
-    response = await doFetch(primaryUrl);
-  } catch (netErr) {
-    // 若 HTTPS 失败（自签名证书未放行），尝试自动回退 HTTP
-    if (settings.restApiHttps) {
-      try {
-        const fallbackUrl = `http://127.0.0.1:${port}/vault/${encodedPath}`;
-        response = await doFetch(fallbackUrl);
-      } catch (e2) {
-        throw new Error(`无法连接到 Obsidian REST API (127.0.0.1:${port})。请确保：1. Obsidian 已打开；2. Local REST API 插件已开启；3. 若使用 HTTPS 请在浏览器打开 https://127.0.0.1:${port} 信任证书，或在设置中切换为 HTTP 协议`);
+      if (response.ok) {
+        return { status: response.status, endpoint: targetUrl };
+      } else if (response.status === 401) {
+        throw new Error('Obsidian REST API Token 无效 (401 Unauthorized)，请检查设置中的 API Key 是否匹配');
+      } else {
+        const errorText = await response.text().catch(() => '');
+        throw new Error(`Obsidian REST API 响应错误 [HTTP ${response.status}]: ${errorText || '写入失败'}`);
       }
-    } else {
-      throw new Error(`无法连接到 Obsidian REST API (127.0.0.1:${port})。请确保 Obsidian 已打开并启用 Local REST API 插件`);
+    } catch (netErr) {
+      lastErr = netErr;
     }
   }
 
-  if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('Obsidian REST API Token 无效 (401 Unauthorized)，请检查设置中的 API Key 是否匹配');
-    }
-    const errorText = await response.text().catch(() => '');
-    throw new Error(`Obsidian REST API 响应错误 [HTTP ${response.status}]: ${errorText || '写入失败'}`);
-  }
-
-  return { status: response.status };
+  throw new Error(lastErr?.message || '无法连接到 Obsidian REST API。请确保 Obsidian 已打开并启用 Local REST API 插件');
 }
 
 function blobToDataUrl(blob) {
