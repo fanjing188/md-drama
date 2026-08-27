@@ -303,6 +303,52 @@ body {
   gap: 12px;
 }
 
+.btn-test-api {
+  background: var(--pixel-bg-card);
+  border: 1.5px solid var(--pixel-border);
+  box-shadow: 1.5px 1.5px 0 var(--pixel-border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--pixel-text);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.1s ease;
+}
+
+.btn-test-api:hover {
+  background: var(--pixel-yellow);
+  transform: translate(-1px, -1px);
+  box-shadow: 2.5px 2.5px 0 var(--pixel-border);
+}
+
+.btn-test-api:active {
+  transform: translate(1.5px, 1.5px);
+  box-shadow: 0 0 0 var(--pixel-border);
+}
+
+.test-api-status {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1.5px solid var(--pixel-border);
+  box-shadow: 1.5px 1.5px 0 var(--pixel-border);
+}
+
+.test-api-status.success {
+  background: #E8FBF2;
+  color: #1E6B4A;
+  border-color: #1E6B4A;
+}
+
+.test-api-status.error {
+  background: #FFF0F0;
+  color: #991B1B;
+  border-color: #991B1B;
+}
+
 /* 3. 底部固定保存栏 */
 .sticky-footer {
   margin-top: 24px;

@@ -84,7 +84,52 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // 3. 表单保存提交
+  // 3. 测试 Obsidian REST API 连通性
+  const btnTestRestApi = document.getElementById('btnTestRestApi');
+  const testApiResult = document.getElementById('testApiResult');
+
+  if (btnTestRestApi) {
+    btnTestRestApi.addEventListener('click', async () => {
+      const port = parseInt(document.getElementById('restApiPort').value, 10) || 27124;
+      const token = document.getElementById('restApiToken').value.trim();
+      const isHttps = document.getElementById('restApiHttps').checked;
+
+      if (!token) {
+        testApiResult.className = 'test-api-status error';
+        testApiResult.innerText = '❌ 请先输入 Obsidian REST API Token';
+        testApiResult.classList.remove('hidden');
+        return;
+      }
+
+      btnTestRestApi.disabled = true;
+      btnTestRestApi.innerText = '⏳ 测试中...';
+      testApiResult.classList.add('hidden');
+
+      chrome.runtime.sendMessage({
+        action: 'testObsidianRestApi',
+        config: {
+          restApiPort: port,
+          restApiToken: token,
+          restApiHttps: isHttps,
+          obsidianSyncMethod: 'rest_api'
+        }
+      }, (res) => {
+        btnTestRestApi.disabled = false;
+        btnTestRestApi.innerHTML = '<span>⚡ 测试 API 连通性</span>';
+
+        if (res && res.connected) {
+          testApiResult.className = 'test-api-status success';
+          testApiResult.innerText = res.message || '✓ 成功连接到 Obsidian Local REST API！';
+        } else {
+          testApiResult.className = 'test-api-status error';
+          testApiResult.innerText = `❌ 连接失败: ${res?.message || '未知错误'}`;
+        }
+        testApiResult.classList.remove('hidden');
+      });
+    });
+  }
+
+  // 4. 表单保存提交
   form.addEventListener('submit', (e) => {
     e.preventDefault();
 
