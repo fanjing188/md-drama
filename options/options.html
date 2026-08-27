@@ -2,114 +2,167 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>md抓马 (MD-Drama) - 设置</title>
+  <title>md抓马 (MD-Drama) - 黑曜石剪藏偏好设置</title>
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h2>md抓马 (MD-Drama) 偏好设置</h2>
-      <p class="subtitle">配置 Obsidian 同步方式、剪藏路径与排版规则</p>
-    </div>
-
-    <form id="settingsForm">
-      <div class="card">
-        <h3>Obsidian 同步设置</h3>
-        
-        <div class="form-group">
-          <label for="obsidianSyncMethod">同步模式</label>
-          <select id="obsidianSyncMethod">
-            <option value="downloads">直接导出 / 下载到目录 (默认)</option>
-            <option value="rest_api">Obsidian Local REST API (推荐，秒级后台静默写入)</option>
-          </select>
-          <div class="hint">使用 REST API 需要在 Obsidian 安装 Local REST API 社区插件并启用。</div>
+  <div class="settings-shell">
+    
+    <!-- 侧边栏与品牌标示 -->
+    <aside class="sidebar">
+      <div class="brand-box">
+        <div class="brand-glyph">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
         </div>
-
-        <div id="restApiConfig" class="form-group">
-          <label for="restApiPort">REST API 端口</label>
-          <input type="number" id="restApiPort" value="27124" placeholder="27124">
-          
-          <label for="restApiToken" style="margin-top: 10px;">API Token</label>
-          <input type="password" id="restApiToken" placeholder="在 Obsidian 插件设置中获取的 API Key">
-
-          <label style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
-            <input type="checkbox" id="restApiHttps" checked> 启用 HTTPS (默认启用)
-          </label>
-        </div>
-
-        <div class="form-group">
-          <label for="vaultSavePath">默认保存相对路径</label>
-          <input type="text" id="vaultSavePath" value="03-知识库/网页剪藏" placeholder="例如：03-知识库/网页剪藏">
-          <div class="hint">相对于 Obsidian 库根目录的存放文件夹。</div>
-        </div>
-
-        <div class="form-group">
-          <label for="attachmentFolder">图片附件子目录</label>
-          <input type="text" id="attachmentFolder" value="attachments" placeholder="attachments">
+        <div class="brand-title">
+          <h2>md抓马</h2>
+          <span>Obsidian Studio</span>
         </div>
       </div>
 
-      <div class="card">
-        <h3>内容智能清洗与去噪</h3>
+      <nav class="nav-menu">
+        <a href="#section-obsidian" class="nav-item active">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>Obsidian 直连</span>
+        </a>
+        <a href="#section-cleaner" class="nav-item">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          <span>清洗去噪</span>
+        </a>
+        <a href="#section-format" class="nav-item">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+          <span>排版与媒体</span>
+        </a>
+      </nav>
+    </aside>
 
-        <div class="form-group">
-          <label style="display: flex; align-items: center; gap: 8px;">
-            <input type="checkbox" id="enableCleaning" checked> 启用内容智能清洗 (过滤广告/废话/噪声)
-          </label>
-        </div>
-
-        <div class="form-group">
-          <label style="display: flex; align-items: center; gap: 8px;">
-            <input type="checkbox" id="removeNoiseWords" checked> 过滤常见引流话术（点赞关注/转发/打赏/营销套话）
-          </label>
-        </div>
-
-        <div class="form-group">
-          <label style="display: flex; align-items: center; gap: 8px;">
-            <input type="checkbox" id="removeRedundantBlankLines" checked> 清理多余空行与格式规范化
-          </label>
-        </div>
-
-        <div class="form-group">
-          <label for="customBlacklist">自定义过滤词/正则列表 (每行一个)</label>
-          <textarea id="customBlacklist" rows="4" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #D1D5DB; font-size: 13px;" placeholder="例如：
-关注公众号
-长按二维码
-/免责声明：.*?$/"></textarea>
-          <div class="hint">支持普通文本或正则表达式（以 / 开头结尾）。</div>
-        </div>
+    <!-- 主设置面板区域 -->
+    <main class="main-content">
+      <div class="header">
+        <h1>偏好设置工坊</h1>
+        <p class="subtitle">管理 Obsidian Local REST API 密钥、智能规则与归档路径</p>
       </div>
 
-      <div class="card">
-        <h3>排版与媒体规则</h3>
+      <form id="settingsForm">
+        <!-- 1. Obsidian 同步设置 -->
+        <section id="section-obsidian" class="card">
+          <div class="card-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <h3>Obsidian 仓库与同步服务</h3>
+          </div>
 
-        <div class="form-group">
-          <label for="imageHandling">图片保存策略</label>
-          <select id="imageHandling">
-            <option value="download">本地化下载至 Obsidian 附件目录 (推荐)</option>
-            <option value="external">保留原始外链</option>
-            <option value="base64">内联 Base64 数据</option>
-          </select>
+          <div class="form-group">
+            <label for="obsidianSyncMethod">同步模式</label>
+            <select id="obsidianSyncMethod">
+              <option value="downloads">直接导出 / 下载至本地目录 (默认)</option>
+              <option value="rest_api">Obsidian Local REST API (推荐：秒级静默直连写入)</option>
+            </select>
+            <div class="hint">使用 REST API 需在 Obsidian 中安装并启用 Local REST API 社区插件。</div>
+          </div>
+
+          <div id="restApiConfig" class="form-group rest-api-box">
+            <div class="input-grid">
+              <div>
+                <label for="restApiPort">REST API 端口</label>
+                <input type="number" id="restApiPort" value="27124" placeholder="27124">
+              </div>
+              <div>
+                <label for="restApiToken">API Token</label>
+                <input type="password" id="restApiToken" placeholder="Obsidian 插件中生成的 API Key">
+              </div>
+            </div>
+
+            <label class="checkbox-row" style="margin-top: 12px;">
+              <input type="checkbox" id="restApiHttps" checked>
+              <span>启用 HTTPS 安全协议 (默认推荐)</span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label for="vaultSavePath">默认归档相对路径</label>
+            <input type="text" id="vaultSavePath" value="03-知识库/网页剪藏" placeholder="例如：03-知识库/网页剪藏">
+            <div class="hint">相对于 Obsidian 仓库根目录的存放文件夹。</div>
+          </div>
+
+          <div class="form-group">
+            <label for="attachmentFolder">图片附件保存子目录</label>
+            <input type="text" id="attachmentFolder" value="attachments" placeholder="attachments">
+          </div>
+        </section>
+
+        <!-- 2. 内容智能清洗与去噪 -->
+        <section id="section-cleaner" class="card">
+          <div class="card-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            <h3>内容智能清洗与去噪</h3>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-row">
+              <input type="checkbox" id="enableCleaning" checked>
+              <span>启用 DOM 智能去噪 (过滤广告容器、点赞栏与浮层)</span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-row">
+              <input type="checkbox" id="removeNoiseWords" checked>
+              <span>过滤常见引流话术 (点赞关注、打赏、一键三连、公众号营销等)</span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-row">
+              <input type="checkbox" id="removeRedundantBlankLines" checked>
+              <span>清理多余空行与无内容引用块</span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label for="customBlacklist">自定义黑名单过滤词 / 正则列表 (每行一条)</label>
+            <textarea id="customBlacklist" rows="4" placeholder="关注公众号&#10;长按二维码&#10;/免责声明：.*?$/"></textarea>
+            <div class="hint">支持匹配文本或正则表达式（以 / 开始和结尾）。</div>
+          </div>
+        </section>
+
+        <!-- 3. 排版与多媒体规则 -->
+        <section id="section-format" class="card">
+          <div class="card-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            <h3>排版与多媒体规则</h3>
+          </div>
+
+          <div class="form-group">
+            <label for="imageHandling">图片资产本地化策略</label>
+            <select id="imageHandling">
+              <option value="download">全量下载至 Obsidian 附件目录 (推荐，免防盗链失效)</option>
+              <option value="external">保留原始网页外链</option>
+              <option value="base64">内联 Base64 编码</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-row">
+              <input type="checkbox" id="includeFrontmatter" checked>
+              <span>自动注入 YAML Frontmatter (标题、来源 URL、抓取日期、标签)</span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-row">
+              <input type="checkbox" id="enableCallouts" checked>
+              <span>兼容 Obsidian Callout 高亮块语法 (&gt; [!NOTE])</span>
+            </label>
+          </div>
+        </section>
+
+        <!-- 底部吸顶提交栏 -->
+        <div class="footer-bar">
+          <button type="submit" id="btnSave" class="btn btn-primary">保存设置</button>
+          <span id="saveStatus" class="status-msg"></span>
         </div>
-
-        <div class="form-group">
-          <label style="display: flex; align-items: center; gap: 8px;">
-            <input type="checkbox" id="includeFrontmatter" checked> 自动注入 YAML Frontmatter (标题/来源/日期/标签)
-          </label>
-        </div>
-
-        <div class="form-group">
-          <label style="display: flex; align-items: center; gap: 8px;">
-            <input type="checkbox" id="enableCallouts" checked> 兼容 Obsidian Callout 语法 (&gt; [!NOTE])
-          </label>
-        </div>
-      </div>
-
-      <div class="footer">
-        <button type="submit" id="btnSave" class="btn btn-primary">保存设置</button>
-        <span id="saveStatus" class="status-msg"></span>
-      </div>
-    </form>
+      </form>
+    </main>
   </div>
 
   <script src="options.js"></script>

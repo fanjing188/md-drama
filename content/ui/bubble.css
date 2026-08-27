@@ -1,4 +1,4 @@
-/* content/ui/bubble.css - 划选气泡与全屏 Mini Toast 样式 */
+/* content/ui/bubble.css - 划选气泡与全屏 Mini Toast (Obsidian Studio Glassmorphism) */
 
 #md-drama-bubble {
   position: absolute;
@@ -6,68 +6,87 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background-color: #181B20;
-  border: 1px solid #3E4552;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  background-color: rgba(19, 22, 28, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.6), 0 0 12px rgba(139, 92, 246, 0.2);
   border-radius: 8px;
-  padding: 5px 8px;
+  padding: 5px 9px;
   cursor: pointer;
   user-select: none;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  font-size: 11.5px;
+  font-weight: 500;
   color: #F3F4F6;
-  transition: transform 0.15s ease, opacity 0.15s ease;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.18s ease;
 }
 
 #md-drama-bubble:hover {
-  background-color: #262B33;
-  transform: scale(1.03);
+  background-color: rgba(26, 29, 36, 0.96);
+  transform: translateY(-2px) scale(1.02);
+  border-color: rgba(139, 92, 246, 0.6);
 }
 
 .md-drama-bubble-icon {
-  background: linear-gradient(135deg, #4F46E5, #8B5CF6);
-  color: #FFF;
+  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+  color: #FFFFFF;
   font-weight: 800;
-  font-size: 10px;
-  padding: 2px 4px;
+  font-size: 9.5px;
+  padding: 2px 5px;
   border-radius: 4px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.4);
 }
 
 /* 全屏右上角静默 Mini Toast */
 #md-drama-global-toast {
   position: fixed;
-  top: 24px;
-  right: 24px;
+  top: 20px;
+  right: 20px;
   z-index: 2147483647;
-  background-color: #181B20;
-  border: 1px solid #3E4552;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
+  background-color: rgba(19, 22, 28, 0.94);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65);
   color: #F3F4F6;
-  padding: 10px 16px;
+  padding: 8px 14px;
   border-radius: 8px;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 13px;
-  animation: drama-toast-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  animation: drama-toast-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#md-drama-global-toast.toast-success {
+  border-color: rgba(16, 185, 129, 0.4);
 }
 
 #md-drama-global-toast.toast-success .toast-mark {
   color: #10B981;
+  font-weight: 800;
+}
+
+#md-drama-global-toast.toast-error {
+  border-color: rgba(244, 63, 94, 0.4);
 }
 
 #md-drama-global-toast.toast-error .toast-mark {
   color: #F43F5E;
+  font-weight: 800;
 }
 
 @keyframes drama-toast-in {
   from {
     opacity: 0;
-    transform: translateY(-12px);
+    transform: translateY(-10px) scale(0.96);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }

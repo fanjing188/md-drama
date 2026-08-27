@@ -1,4 +1,4 @@
-// popup/popup.js - 极致流畅交互、节点动态演进与灵感工作台
+// popup/popup.js - 极致流畅交互、节点动态演进与灵感工作台 (Obsidian Studio)
 
 let currentExtractData = null;
 let currentSettings = null;
@@ -7,6 +7,7 @@ const logger = new DramaLogger('PopupStudio');
 document.addEventListener('DOMContentLoaded', async () => {
   currentSettings = await getSettings();
   initTargetRouteLabel();
+  initObsidianConnectionDot();
 
   // 绑定交互事件
   const btnPrimaryCrawl = document.getElementById('btnPrimaryCrawl');
@@ -20,6 +21,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnCopyMarkdown = document.getElementById('btnCopyMarkdown');
   const inputNewTag = document.getElementById('inputNewTag');
   const inputDocTitle = document.getElementById('inputDocTitle');
+
+  // Tab 模式切换 (Markdown 源码 vs Obsidian 效果预览)
+  const btnTabEdit = document.getElementById('btnTabEdit');
+  const btnTabPreview = document.getElementById('btnTabPreview');
+  const markdownCode = document.getElementById('markdownCode');
+  const markdownPreview = document.getElementById('markdownPreview');
+
+  if (btnTabEdit && btnTabPreview) {
+    btnTabEdit.addEventListener('click', () => {
+      btnTabEdit.classList.add('active');
+      btnTabPreview.classList.remove('active');
+      markdownCode.classList.remove('hidden');
+      markdownPreview.classList.add('hidden');
+    });
+
+    btnTabPreview.addEventListener('click', () => {
+      btnTabPreview.classList.add('active');
+      btnTabEdit.classList.remove('active');
+      markdownCode.classList.add('hidden');
+      markdownPreview.classList.remove('hidden');
+      renderMarkdownPreview();
+    });
+  }
 
   btnOptions.addEventListener('click', () => chrome.runtime.openOptionsPage());
   btnLogs.addEventListener('click', () => openLogsDrawer());
@@ -80,6 +104,20 @@ async function initTargetRouteLabel() {
   }
 }
 
+// 初始化 Obsidian REST API 联通状态点
+function initObsidianConnectionDot() {
+  const dot = document.getElementById('obsidianStatusDot');
+  if (!dot) return;
+  if (currentSettings && currentSettings.obsidianSyncMethod === 'rest_api') {
+    dot.className = 'status-dot green';
+    dot.title = 'Obsidian Local REST API 已配置静默直连';
+  } else {
+    dot.className = 'status-dot';
+    dot.style.backgroundColor = '#9CA3AF';
+    dot.title = '当前为本地导出/下载模式';
+  }
+}
+
 // 节点动态状态机驱动 (Stage Node State Machine)
 function setPipelineStage(stageIndex, statusText, percentVal) {
   const pipelineFill = document.getElementById('pipelineFill');
@@ -136,6 +174,24 @@ function addTagChip(tag) {
     currentExtractData.metadata.tags.push(tag);
     renderTags(currentExtractData.metadata.tags);
   }
+}
+
+// 渲染 Obsidian Markdown 效果预览
+function renderMarkdownPreview() {
+  const markdownPreview = document.getElementById('markdownPreview');
+  if (!markdownPreview) return;
+  const rawMd = assembleFinalMarkdown();
+  
+  // 简易 Markdown 转 HTML 视觉预览
+  let html = rawMd
+    .replace(/^> \[!NOTE\] (.*$)/gim, '<div style="background:rgba(139,92,246,0.12);border-left:3px solid #8B5CF6;padding:6px 10px;margin:8px 0;border-radius:4px;"><strong style="color:#8B5CF6;">📝 NOTE</strong> $1</div>')
+    .replace(/^### (.*$)/gim, '<h3 style="font-size:13px;color:#F3F4F6;margin:10px 0 4px;">$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2 style="font-size:14px;color:#F3F4F6;margin:12px 0 6px;">$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1 style="font-size:15px;color:#F3F4F6;margin:14px 0 8px;">$1</h1>')
+    .replace(/\[\[(.*?)\]\]/g, '<span style="color:#8B5CF6;background:rgba(139,92,246,0.15);padding:1px 4px;border-radius:3px;">[[$1]]</span>')
+    .replace(/\n/g, '<br>');
+
+  markdownPreview.innerHTML = html;
 }
 
 function showFlyoutToast(text, isSuccess = true) {
