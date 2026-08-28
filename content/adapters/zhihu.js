@@ -83,36 +83,68 @@ class ZhihuAdapter {
       '.ZhihuCard',
       '.Recommendations-Main',
       '.ConsultHint',
-      '.KfeCollection-PcStick'
+      '.KfeCollection-PcStick',
+      '.Voters',
+      '.Comments-container',
+      '.CornerButtons'
     ];
     noiseSelectors.forEach(sel => container.querySelectorAll(sel).forEach(el => el.remove()));
 
     // 知乎站内链接规范化
     ZhihuAdapter.normalizeZhihuLinks(container);
 
-    // 修复知乎真实图片地址 (data-actualsrc / data-original)
-    container.querySelectorAll('img').forEach(img => {
-      const realSrc = img.getAttribute('data-actualsrc') ||
-                      img.getAttribute('data-original') ||
-                      img.getAttribute('data-rawsrc') ||
-                      img.src;
-      if (realSrc) {
-        img.setAttribute('src', realSrc);
+    // 修复知乎数学公式 (知乎包含多种 LaTeX 渲染变体: .ztext-math, img.ee_img, [data-formula], [data-latex], KaTeX)
+    container.querySelectorAll('.ztext-math, img.ee_img, [data-formula], [data-latex]').forEach(mathEl => {
+      let formula = mathEl.getAttribute('data-formula') ||
+                    mathEl.getAttribute('data-math') ||
+                    mathEl.getAttribute('data-latex');
+
+      if (!formula && mathEl.tagName === 'IMG') {
+        const alt = mathEl.getAttribute('alt') || '';
+        if (alt && (alt.includes('\\') || alt.includes('_') || alt.includes('^'))) {
+          formula = alt;
+        }
       }
-      // 过滤知乎头像与情绪图标
-      const src = img.getAttribute('src') || '';
-      if (/people\/.*_isize|\.svg$/i.test(src) && !/equation/.test(src)) {
-        img.remove();
+
+      if (!formula) {
+        const texScript = mathEl.querySelector('script[type*="math/tex"], annotation[encoding*="tex"]');
+        if (texScript) formula = texScript.textContent;
+      }
+
+      if (formula) {
+        formula = formula.trim().replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+        const isDisplay = mathEl.classList.contains('ztext-math-display') ||
+                          mathEl.getAttribute('data-display') === 'true' ||
+                          mathEl.tagName === 'DIV';
+        if (isDisplay) {
+          const p = document.createElement('p');
+          p.textContent = `$$${formula}$$`;
+          mathEl.parentNode.replaceChild(p, mathEl);
+        } else {
+          const span = document.createElement('span');
+          span.textContent = ` $${formula}$ `;
+          mathEl.parentNode.replaceChild(span, mathEl);
+        }
       }
     });
 
-    // 修复知乎数学公式 (知乎常将 LaTeX 公式放在 data-formula 属性中)
-    container.querySelectorAll('.ztext-math').forEach(mathEl => {
-      const formula = mathEl.getAttribute('data-formula') || mathEl.getAttribute('data-math');
-      if (formula) {
-        const span = document.createElement('span');
-        span.textContent = ` $${formula}$ `;
-        mathEl.parentNode.replaceChild(span, mathEl);
+    // 修复知乎真实图片地址 (data-actualsrc / data-original) 并提取高清原图 (将 _r / _b / _720w 等替换为高清)
+    container.querySelectorAll('img').forEach(img => {
+      let realSrc = img.getAttribute('data-actualsrc') ||
+                    img.getAttribute('data-original') ||
+                    img.getAttribute('data-rawsrc') ||
+                    img.src;
+      if (realSrc) {
+        // 过滤知乎头像与系统/情绪图标
+        if (/people\/.*_isize|\.svg$/i.test(realSrc) && !/equation/.test(realSrc)) {
+          img.remove();
+          return;
+        }
+        // 提取原图：将缩略图后缀替换为 _r 或 _hd (针对 zhimg.com)
+        if (/v2-[a-f0-9]+_[a-z0-9]+\.(jpg|jpeg|png|webp)/i.test(realSrc)) {
+          realSrc = realSrc.replace(/_[a-z0-9]+(\.(?:jpg|jpeg|png|webp))/i, '_r$1');
+        }
+        img.setAttribute('src', realSrc);
       }
     });
 

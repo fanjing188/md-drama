@@ -209,14 +209,14 @@ class TransformersRegistry {
     this.register({
       name: 'background-image-restorer',
       match: (node) => {
-        if (node.tagName === 'IMG' || node.tagName === 'BODY') return false;
+        if (node.tagName === 'IMG' || node.tagName === 'BODY' || node.tagName === 'HTML') return false;
         const bg = node.style && node.style.backgroundImage;
         return bg && bg.includes('url(');
       },
       transform: (node) => {
         const bg = node.style.backgroundImage;
-        const match = bg.match(/url\(['"]?(.*?)['"]?\)/);
-        if (match && match[1] && !node.querySelector('img')) {
+        const match = bg.match(/url\(['"]?(.*?)['"]?\)/i);
+        if (match && match[1] && !match[1].startsWith('data:image/svg') && !node.querySelector('img')) {
           const img = document.createElement('img');
           img.src = match[1];
           img.alt = 'embedded-image';
@@ -225,26 +225,163 @@ class TransformersRegistry {
       }
     });
 
-    // 7. 提示块/Callout 语义转换
+    // 7. 智能多色 Callout / 提示盒标准化 (Obsidian Callout: NOTE, TIP, WARNING, DANGER, INFO, FAQ 等)
     this.register({
-      name: 'callout-block-normalizer',
+      name: 'obsidian-callout-normalizer',
       match: (node) => {
         if (!node.classList) return false;
+        const cls = node.className || '';
+        const tag = node.tagName;
         return node.classList.contains('callout') ||
                node.classList.contains('alert') ||
                node.classList.contains('admonition') ||
-               node.classList.contains('notice-block');
+               node.classList.contains('notice-block') ||
+               node.classList.contains('notion-callout') ||
+               node.classList.contains('notion-callout-block') ||
+               tag === 'NE-ALERT' ||
+               node.hasAttribute('data-callout-type');
       },
       transform: (node) => {
+        // 如果已经是处理过的 blockquote 则跳过
+        if (node.tagName === 'BLOCKQUOTE' && node.querySelector('strong')?.textContent.includes('[!')) return;
+
+        // 智能推断 Callout 类型 (NOTE, TIP, WARNING, DANGER, INFO, FAQ, SUCCESS, BUG, EXAMPLE)
+        let calloutType = 'NOTE';
+        const fullCls = (node.className + ' ' + (node.getAttribute('data-callout-type') || '')).toLowerCase();
+        const style = (node.getAttribute('style') || '').toLowerCase();
+
+        if (fullCls.includes('danger') || fullCls.includes('error') || fullCls.includes('red') || style.includes('red') || style.includes('rgb(255, 235') || style.includes('#ff4d4f') || style.includes('#ffe8e6')) {
+          calloutType = 'DANGER';
+        } else if (fullCls.includes('warning') || fullCls.includes('caution') || fullCls.includes('orange') || fullCls.includes('amber') || fullCls.includes('yellow') || style.includes('rgb(255, 251') || style.includes('#faad14') || style.includes('#fffbe6')) {
+          calloutType = 'WARNING';
+        } else if (fullCls.includes('tip') || fullCls.includes('success') || fullCls.includes('green') || style.includes('green') || style.includes('rgb(235, 255') || style.includes('#52c41a') || style.includes('#f6ffed')) {
+          calloutType = 'TIP';
+        } else if (fullCls.includes('info') || fullCls.includes('blue') || fullCls.includes('cyan') || style.includes('blue') || style.includes('rgb(230, 247') || style.includes('#1890ff') || style.includes('#e6f7ff')) {
+          calloutType = 'INFO';
+        } else if (fullCls.includes('faq') || fullCls.includes('question') || fullCls.includes('help') || fullCls.includes('purple') || style.includes('purple') || style.includes('rgb(249, 240') || style.includes('#722ed1') || style.includes('#f9f0ff')) {
+          calloutType = 'FAQ';
+        }
+
+        // 提取自定义 Emoji / 图标
+        const emojiEl = node.querySelector('.callout-emoji, .emoji-picker, .callout-icon, .notion-page-icon, .alert-icon');
+        const emoji = emojiEl ? (emojiEl.textContent || '').trim() : '';
+
+        // 提取标题与正文
+        const titleEl = node.querySelector('.callout-title, .alert-title, .admonition-title');
+        const title = titleEl ? titleEl.textContent.trim() : '';
+        if (titleEl) titleEl.remove();
+        if (emojiEl) emojiEl.remove();
+
         const bq = document.createElement('blockquote');
-        bq.innerHTML = `<strong>[!NOTE]</strong><br>${node.innerHTML}`;
+        const headerText = `[!${calloutType}]` + (emoji ? ` ${emoji}` : '') + (title ? ` ${title}` : '');
+        bq.innerHTML = `<strong>${headerText}</strong><br>${node.innerHTML.trim()}`;
+
         if (node.parentNode) {
           node.parentNode.replaceChild(bq, node);
         }
       }
     });
 
-    // 8. 块级子元素链接拍平: <a> 内含 div/p 等块级结构时 (Notion 卡片链接等),
+    // 8. 文本荧光笔高亮 (Mark / Highlight -> ==高亮文本==)
+    this.register({
+      name: 'mark-highlight-normalizer',
+      match: (node) => {
+        if (node.tagName === 'MARK') return true;
+        if (node.tagName === 'SPAN') {
+          const style = node.getAttribute('style') || '';
+          const bg = style.toLowerCase();
+          const hasBg = bg.includes('background-color') || bg.includes('background:');
+          const isHighlight = hasBg && (
+            bg.includes('yellow') || bg.includes('#ff') || bg.includes('#fef') ||
+            bg.includes('rgb(255') || bg.includes('rgba(255') ||
+            bg.includes('rgba(254') || bg.includes('rgba(250') ||
+            node.hasAttribute('data-highlight') ||
+            node.classList?.contains('text-highlight') ||
+            node.classList?.contains('highlight-text')
+          );
+          // 仅对行内短语进行 mark 包装，避免误伤整个大容器
+          return isHighlight && (node.textContent || '').length < 300 && !node.querySelector('p, div, h1, h2, h3, h4, h5, h6, table, ul, ol');
+        }
+        return false;
+      },
+      transform: (node) => {
+        if (node.tagName !== 'MARK') {
+          const mark = document.createElement('mark');
+          while (node.firstChild) mark.appendChild(node.firstChild);
+          if (node.parentNode) node.parentNode.replaceChild(mark, node);
+        }
+      }
+    });
+
+    // 9. Iframe 嵌入组件卡片化 (Bilibili, YouTube, Figma, CodePen, 通用嵌入)
+    this.register({
+      name: 'iframe-embed-normalizer',
+      match: (node) => node.tagName === 'IFRAME',
+      transform: (node) => {
+        const src = node.getAttribute('src') || node.getAttribute('data-src') || '';
+        if (!src) return;
+
+        let embedCard = null;
+
+        // Bilibili 嵌入视频
+        if (/bilibili\.com/i.test(src)) {
+          const bvidMatch = src.match(/bvid=([a-zA-Z0-9]+)/i) || src.match(/\/([a-zA-Z0-9]{12})/);
+          const bvid = bvidMatch ? bvidMatch[1] : '';
+          const link = bvid ? `https://www.bilibili.com/video/${bvid}` : src;
+          embedCard = document.createElement('p');
+          embedCard.innerHTML = `🎬 <strong>[哔哩哔哩视频]</strong> <a href="${link}">${link}</a>`;
+        }
+        // YouTube 嵌入视频
+        else if (/youtube\.com|youtu\.be/i.test(src)) {
+          const ytMatch = src.match(/embed\/([a-zA-Z0-9_-]+)/i) || src.match(/v=([a-zA-Z0-9_-]+)/i);
+          const ytId = ytMatch ? ytMatch[1] : '';
+          const link = ytId ? `https://www.youtube.com/watch?v=${ytId}` : src;
+          embedCard = document.createElement('p');
+          embedCard.innerHTML = `🎬 <strong>[YouTube 视频]</strong> <a href="${link}">${link}</a>`;
+        }
+        // Figma 画板设计
+        else if (/figma\.com/i.test(src)) {
+          const figmaUrlMatch = src.match(/url=([^&]+)/i);
+          const figmaUrl = figmaUrlMatch ? decodeURIComponent(figmaUrlMatch[1]) : src;
+          embedCard = document.createElement('p');
+          embedCard.innerHTML = `🎨 <strong>[Figma 设计稿]</strong> <a href="${figmaUrl}">${figmaUrl}</a>`;
+        }
+        // CodePen 演示
+        else if (/codepen\.io/i.test(src)) {
+          embedCard = document.createElement('p');
+          embedCard.innerHTML = `💻 <strong>[CodePen 代码演示]</strong> <a href="${src}">${src}</a>`;
+        }
+        // 通用 Iframe 嵌入
+        else {
+          const title = node.getAttribute('title') || '嵌入式网页内容';
+          embedCard = document.createElement('p');
+          embedCard.innerHTML = `🔗 <strong>[嵌入组件: ${title}]</strong> <a href="${src}">${src}</a>`;
+        }
+
+        if (embedCard && node.parentNode) {
+          node.parentNode.replaceChild(embedCard, node);
+        }
+      }
+    });
+
+    // 10. 折叠详情块 (<details> / <summary>) 结构规范化
+    this.register({
+      name: 'details-summary-normalizer',
+      match: (node) => node.tagName === 'DETAILS',
+      transform: (node) => {
+        const summary = node.querySelector('summary');
+        const summaryText = summary ? summary.textContent.trim() : '折叠详情';
+        if (summary) summary.remove();
+
+        const bq = document.createElement('blockquote');
+        bq.innerHTML = `<strong>[!FAQ]- ${summaryText}</strong><br>${node.innerHTML.trim()}`;
+        if (node.parentNode) {
+          node.parentNode.replaceChild(bq, node);
+        }
+      }
+    });
+
+    // 11. 块级子元素链接拍平: <a> 内含 div/p 等块级结构时 (Notion 卡片链接等),
     //    用纯文本替换, 避免生成跨行断裂的 Markdown 链接
     this.register({
       name: 'block-link-flattener',
@@ -259,7 +396,7 @@ class TransformersRegistry {
       }
     });
 
-    // 9. 相对地址绝对化: a[href] 与 img 的相对地址转为绝对 URL,
+    // 12. 相对地址绝对化: a[href] 与 img 的相对地址转为绝对 URL,
     //    保证剪藏后的 Markdown 链接/图片在任何位置都能访问
     this.register({
       name: 'relative-url-absolutizer',

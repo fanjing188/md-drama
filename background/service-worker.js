@@ -54,6 +54,13 @@ const DEFAULT_SETTINGS = {
 // 后台常驻任务跟踪池（即使切换标签页或关闭弹窗，任务也持续在后台完成并保存）
 const activeCrawlTasks = new Map();
 
+// 标签页关闭时清理对应的后台任务缓存，防止内存泄漏
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (activeCrawlTasks.has(tabId)) {
+    activeCrawlTasks.delete(tabId);
+  }
+});
+
 chrome.runtime.onInstalled.addListener((details) => {
   chrome.storage.sync.get(null, (items) => {
     const newSettings = { ...DEFAULT_SETTINGS, ...items };

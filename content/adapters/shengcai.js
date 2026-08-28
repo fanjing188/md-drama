@@ -61,17 +61,49 @@ class ShengcaiAdapter {
     const container = mainPost.cloneNode(true);
 
     // 展开所有可能被折叠的全文与按钮
-    container.querySelectorAll('.show-more, .expand-btn, .open-btn, .read-more, .fold-mask').forEach(btn => btn.remove());
+    container.querySelectorAll('.show-more, .expand-btn, .open-btn, .read-more, .fold-mask, .fold-btn').forEach(btn => btn.remove());
 
-    // 解析并提取高清图片 (优先取 data-origin-src / data-original)
+    // 处理问答 (Q&A) 帖结构
+    const questionEl = container.querySelector('.question-container, .ask-item, .question-wrapper');
+    const answerEl = container.querySelector('.answer-container, .answer-item, .answer-wrapper');
+    if (questionEl && answerEl) {
+      const qAuthor = (questionEl.querySelector('.author-name, .ask-user, .name')?.textContent || '').trim() || '提问者';
+      const qText = (questionEl.querySelector('.text, .content, .ask-content')?.innerHTML || questionEl.innerHTML || '').trim();
+      const qBlock = document.createElement('blockquote');
+      qBlock.innerHTML = `<strong>[!QUESTION] 提问 (@${qAuthor})</strong><br>${qText}`;
+
+      const aAuthor = (answerEl.querySelector('.author-name, .answer-user, .name')?.textContent || '').trim() || '嘉宾/星主';
+      const aText = (answerEl.querySelector('.text, .content, .answer-content')?.innerHTML || answerEl.innerHTML || '').trim();
+      const aBlock = document.createElement('blockquote');
+      aBlock.innerHTML = `<strong>[!TIP] 回答 (@${aAuthor})</strong><br>${aText}`;
+
+      const qaWrapper = document.createElement('div');
+      qaWrapper.appendChild(qBlock);
+      qaWrapper.appendChild(aBlock);
+      if (questionEl.parentNode) questionEl.parentNode.replaceChild(qaWrapper, questionEl);
+      answerEl.remove();
+    }
+
+    // 处理音频卡片
+    container.querySelectorAll('.audio-item, .voice-item, .talk-audio, audio').forEach(audioEl => {
+      const audioSrc = audioEl.getAttribute('src') || audioEl.querySelector('source')?.getAttribute('src') || '';
+      const audioTitle = (audioEl.querySelector('.title, .audio-title, .name')?.textContent || '').trim() || '语音录音';
+      const p = document.createElement('p');
+      p.innerHTML = `🎵 <strong>[语音: ${audioTitle}]</strong> ${audioSrc ? `<a href="${audioSrc}">点击收听</a>` : ''}`;
+      if (audioEl.parentNode) audioEl.parentNode.replaceChild(p, audioEl);
+    });
+
+    // 解析并提取高清图片 (优先取 data-origin-src / data-original，并剔除缩略图裁剪参数)
     container.querySelectorAll('img').forEach(img => {
-      const realSrc = img.getAttribute('data-origin-src') ||
-                      img.getAttribute('data-original') ||
-                      img.getAttribute('data-large-url') ||
-                      img.getAttribute('data-src') ||
-                      img.getAttribute('data-actualsrc') ||
-                      img.src;
+      let realSrc = img.getAttribute('data-origin-src') ||
+                    img.getAttribute('data-original') ||
+                    img.getAttribute('data-large-url') ||
+                    img.getAttribute('data-src') ||
+                    img.getAttribute('data-actualsrc') ||
+                    img.src;
       if (realSrc) {
+        // 剔除七牛/阿里云等图像处理缩略参数
+        realSrc = realSrc.replace(/\?imageMogr2\/.*$/i, '').replace(/x-oss-process=image\/resize[^&]+/i, '');
         img.setAttribute('src', realSrc);
       }
     });

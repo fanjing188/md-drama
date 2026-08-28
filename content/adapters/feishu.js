@@ -52,7 +52,9 @@ class FeishuAdapter {
                      el.closest?.('[data-block-id]')?.getAttribute('data-block-id');
 
     if (imgToken && recordId) {
-      return `https://internal-api-drive-stream.feishu.cn/space/api/box/stream/download/v2/cover/${imgToken}/?fallback_source=1&height=1280&mount_node_token=${recordId}&mount_point=docx_image&policy=equal&width=1280`;
+      const isLark = typeof window !== 'undefined' && window.location && window.location.hostname.includes('larksuite.com');
+      const host = isLark ? 'internal-api-drive-stream.larksuite.com' : 'internal-api-drive-stream.feishu.cn';
+      return `https://${host}/space/api/box/stream/download/v2/cover/${imgToken}/?fallback_source=1&height=1280&mount_node_token=${recordId}&mount_point=docx_image&policy=equal&width=1280`;
     }
 
     // 2. 检查常见图片属性
@@ -185,7 +187,7 @@ class FeishuAdapter {
       if (block.parentNode) block.parentNode.replaceChild(frag, block);
     });
 
-    // 5. 标题块: heading1..heading9 -> h1..h6
+    // 5. 标题块: heading1..heading9 -> h1..h6 (含折叠标题识别)
     container.querySelectorAll('[data-block-type^="heading"]').forEach(block => {
       const m = block.getAttribute('data-block-type').match(/^heading(\d)$/);
       if (!m) return;
@@ -200,12 +202,50 @@ class FeishuAdapter {
         const contentRoot = block.querySelector('.heading-block-content, .render-unit-wrapper') || block;
         while (contentRoot.firstChild) h.appendChild(contentRoot.firstChild);
       }
-      if (h.textContent.trim() && block.parentNode) block.parentNode.replaceChild(h, block);
+
+      // 如果标题下挂载了折叠子内容，转为结构
+      const childrenWrapper = block.querySelector('.heading-block-children, .collapsible-content');
+      if (childrenWrapper && childrenWrapper.children.length > 0) {
+        const frag = doc.createDocumentFragment();
+        frag.appendChild(h);
+        while (childrenWrapper.firstChild) frag.appendChild(childrenWrapper.firstChild);
+        if (block.parentNode) block.parentNode.replaceChild(frag, block);
+      } else if (h.textContent.trim() && block.parentNode) {
+        block.parentNode.replaceChild(h, block);
+      }
     });
 
-    // 6. 文本块: data-block-type="text"
-    container.querySelectorAll('[data-block-type="text"]').forEach(block => {
-      const lines = block.querySelectorAll('.ace-line');
+    // 5.1 折叠列表与折叠块 (toggle / toggle_heading / collapsible)
+    container.querySelectorAll('[data-block-type="toggle"], [data-block-type="toggle_heading"], .toggle-block, [data-folded]').forEach(block => {
+      const titleEl = block.querySelector('.toggle-header, .toggle-title, .toggle-header-text, .toggle-title-text, .ace-line') || block.firstChild;
+      const titleText = titleEl ? titleEl.textContent.replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim() : '折叠列表';
+      const childrenRoot = block.querySelector('.toggle-block-children, .toggle-children, .toggle-content, .collapsible-content') || block;
+
+      // 构建 Obsidian 折叠 Callout 格式 (FAQ 类似) 或 details/summary
+      const bq = doc.createElement('blockquote');
+      const pHead = doc.createElement('p');
+      pHead.innerHTML = `<strong>[!FAQ]- ${titleText}</strong>`;
+      bq.appendChild(pHead);
+
+      if (childrenRoot && childrenRoot !== block) {
+        while (childrenRoot.firstChild) bq.appendChild(childrenRoot.firstChild);
+      } else {
+        const lines = block.querySelectorAll('.ace-line');
+        // 第一行是标题，其余是子内容
+        if (lines.length > 1) {
+          for (let i = 1; i < lines.length; i++) {
+            const p = doc.createElement('p');
+            while (lines[i].firstChild) p.appendChild(lines[i].firstChild);
+            bq.appendChild(p);
+          }
+        }
+      }
+      if (block.parentNode) block.parentNode.replaceChild(bq, block);
+    });
+
+    // 6. 文本块: data-block-type="text" / "paragraph" / "body" 等
+    container.querySelectorAll('[data-block-type="text"], [data-block-type="paragraph"], [data-block-type="body"], .text-block-wrapper').forEach(block => {
+      const lines = block.querySelectorAll('.ace-line, .ace_line, .view-line');
       const frag = doc.createDocumentFragment();
       if (lines.length > 0) {
         lines.forEach(line => {
@@ -214,8 +254,8 @@ class FeishuAdapter {
           frag.appendChild(p);
         });
       } else {
-        // 当无 .ace-line (新版 Docx 或 /file/ 预览) 时，直接提取子节点或内容
-        const contentRoot = block.querySelector('.text-block-content, .render-unit-wrapper') || block;
+        // 当无行选择器时，提取正文子节点
+        const contentRoot = block.querySelector('.text-block-content, .render-unit-wrapper, .zone-container') || block;
         const p = doc.createElement('p');
         while (contentRoot.firstChild) p.appendChild(contentRoot.firstChild);
         frag.appendChild(p);
@@ -223,7 +263,7 @@ class FeishuAdapter {
       if (block.parentNode) block.parentNode.replaceChild(frag, block);
     });
 
-    // 7. 高亮块 (callout / highlight-block) -> Obsidian [!NOTE] (带自定义 Emoji 识别)
+    // 7. 高亮块 (callout / highlight-block) -> 智能推断颜色类型 (DANGER, WARNING, TIP, INFO, NOTE)
     const calloutBlocks = Array.from(container.querySelectorAll('[data-block-type="callout"], .callout-block, .highlight-block'));
     const processedCallouts = [];
     for (const block of calloutBlocks) {
@@ -231,11 +271,27 @@ class FeishuAdapter {
       processedCallouts.push(block);
 
       const emojiEl = block.querySelector('.callout-emoji, .emoji-picker, .callout-icon');
-      const emoji = emojiEl ? (emojiEl.textContent || '').trim() : '💡';
+      const emoji = emojiEl ? (emojiEl.textContent || '').trim() : '';
+
+      // 提取背景色或样式特征
+      const style = (block.getAttribute('style') || '').toLowerCase();
+      const cls = (block.className || '').toLowerCase();
+      let calloutType = 'NOTE';
+      if (cls.includes('red') || style.includes('red') || style.includes('255, 235') || style.includes('#ffe8e6') || style.includes('#ff4d4f')) {
+        calloutType = 'DANGER';
+      } else if (cls.includes('yellow') || cls.includes('orange') || style.includes('255, 251') || style.includes('#fffbe6') || style.includes('#faad14')) {
+        calloutType = 'WARNING';
+      } else if (cls.includes('green') || style.includes('green') || style.includes('235, 255') || style.includes('#f6ffed') || style.includes('#52c41a')) {
+        calloutType = 'TIP';
+      } else if (cls.includes('blue') || cls.includes('cyan') || style.includes('blue') || style.includes('230, 247') || style.includes('#e6f7ff') || style.includes('#1890ff')) {
+        calloutType = 'INFO';
+      } else if (cls.includes('purple') || style.includes('purple') || style.includes('249, 240') || style.includes('#f9f0ff') || style.includes('#722ed1')) {
+        calloutType = 'FAQ';
+      }
 
       const bq = doc.createElement('blockquote');
       const pHeader = doc.createElement('p');
-      pHeader.innerHTML = `<strong>[!NOTE] ${emoji}</strong>`;
+      pHeader.innerHTML = `<strong>[!${calloutType}] ${emoji || '💡'}</strong>`;
       bq.appendChild(pHeader);
 
       const contentRoot = block.querySelector('.callout-block-children, .callout-content') || block;
@@ -266,38 +322,64 @@ class FeishuAdapter {
       }
     });
 
-    // 9. 列表块: bullet/ordered -> ul/li, ol/li
-    container.querySelectorAll('[data-block-type="bullet"]').forEach(block => {
-      const li = doc.createElement('li');
-      const lines = block.querySelectorAll('.ace-line');
-      if (lines.length > 0) {
-        lines.forEach(line => { while (line.firstChild) li.appendChild(line.firstChild); });
-      } else {
-        const contentRoot = block.querySelector('.bullet-block-content, .render-unit-wrapper') || block;
-        while (contentRoot.firstChild) li.appendChild(contentRoot.firstChild);
-      }
-      if (block.parentNode) block.parentNode.replaceChild(li, block);
-    });
+    // 9. 列表块: bullet/ordered -> ul/li, ol/li (支持 data-indent-level 多级嵌套结构还原)
+    const listBlocks = Array.from(container.querySelectorAll('[data-block-type="bullet"], [data-block-type="ordered"]'));
+    if (listBlocks.length > 0) {
+      // 构建真正的多级嵌套列表树
+      let currentRoot = null;
+      let currentType = null;
+      const stack = []; // [{ level, listEl, lastLi }]
 
-    container.querySelectorAll('[data-block-type="ordered"]').forEach(block => {
-      const li = doc.createElement('li');
-      const lines = block.querySelectorAll('.ace-line');
-      if (lines.length > 0) {
-        lines.forEach(line => { while (line.firstChild) li.appendChild(line.firstChild); });
-      } else {
-        const contentRoot = block.querySelector('.ordered-block-content, .render-unit-wrapper') || block;
-        while (contentRoot.firstChild) li.appendChild(contentRoot.firstChild);
-      }
-      if (block.parentNode) block.parentNode.replaceChild(li, block);
-    });
+      listBlocks.forEach(block => {
+        const type = block.getAttribute('data-block-type') === 'ordered' ? 'ol' : 'ul';
+        const indent = parseInt(block.getAttribute('data-indent-level') || '0', 10);
+        const li = doc.createElement('li');
 
-    container.querySelectorAll('li').forEach(li => {
-      if (li.parentNode && li.parentNode.tagName !== 'UL' && li.parentNode.tagName !== 'OL') {
-        const ul = doc.createElement('ul');
-        li.parentNode.insertBefore(ul, li);
-        ul.appendChild(li);
-      }
-    });
+        const lines = block.querySelectorAll('.ace-line');
+        if (lines.length > 0) {
+          lines.forEach(line => { while (line.firstChild) li.appendChild(line.firstChild); });
+        } else {
+          const contentRoot = block.querySelector('.bullet-block-content, .ordered-block-content, .render-unit-wrapper') || block;
+          while (contentRoot.firstChild) li.appendChild(contentRoot.firstChild);
+        }
+
+        const isConsecutive = block.previousElementSibling &&
+          (block.previousElementSibling.matches('[data-block-type="bullet"], [data-block-type="ordered"]') ||
+           block.previousElementSibling === currentRoot);
+
+        if (!currentRoot || !isConsecutive) {
+          // 开启一个全新的列表树
+          currentRoot = doc.createElement(type);
+          currentType = type;
+          stack.length = 0;
+          stack.push({ level: indent, listEl: currentRoot, lastLi: li });
+          currentRoot.appendChild(li);
+          if (block.parentNode) block.parentNode.replaceChild(currentRoot, block);
+        } else {
+          // 连续列表项：按缩进计算层级
+          while (stack.length > 1 && stack[stack.length - 1].level > indent) {
+            stack.pop();
+          }
+
+          if (stack[stack.length - 1].level === indent) {
+            stack[stack.length - 1].listEl.appendChild(li);
+            stack[stack.length - 1].lastLi = li;
+          } else if (indent > stack[stack.length - 1].level) {
+            // 更深一层：嵌套在上一项的 li 内部
+            const subList = doc.createElement(type);
+            subList.appendChild(li);
+            const parentLi = stack[stack.length - 1].lastLi || stack[stack.length - 1].listEl.lastElementChild;
+            if (parentLi) {
+              parentLi.appendChild(subList);
+            } else {
+              stack[stack.length - 1].listEl.appendChild(subList);
+            }
+            stack.push({ level: indent, listEl: subList, lastLi: li });
+          }
+          block.remove();
+        }
+      });
+    }
 
     // 10. 任务清单 / Todo 块
     container.querySelectorAll('[data-block-type="todo"], [data-block-type="task"]').forEach(block => {
@@ -315,19 +397,37 @@ class FeishuAdapter {
       if (block.parentNode) block.parentNode.replaceChild(li, block);
     });
 
-    // 11. 代码块 (code)
-    container.querySelectorAll('[data-block-type="code"]').forEach(block => {
-      const codeEl = block.querySelector('.code-block-content, .zone-container, pre') || block;
-      const langAttr = block.getAttribute('data-lang') || block.querySelector('[data-lang]')?.getAttribute('data-lang') || '';
+    // 11. 代码块 (code / code_block / monaco / ace / block-code)
+    container.querySelectorAll('[data-block-type="code"], [data-block-type="code_block"], .code-block-wrapper, .docx-code-block, .code-block-container').forEach(block => {
+      // 提取代码语言（支持多位置）
+      const langAttr = block.getAttribute('data-lang') ||
+                       block.getAttribute('data-language') ||
+                       block.querySelector('[data-lang]')?.getAttribute('data-lang') ||
+                       block.querySelector('[data-language]')?.getAttribute('data-language') ||
+                       block.querySelector('.code-lang, .code-language, .lang-text')?.textContent?.trim() ||
+                       '';
+
       const pre = doc.createElement('pre');
-      if (langAttr) pre.setAttribute('data-lang', langAttr);
+      if (langAttr) pre.setAttribute('data-lang', langAttr.toLowerCase());
+
+      // 剔除语言头部栏与复制按钮，避免把 "Python 复制" 等 UI 文本混入代码
+      const clone = block.cloneNode(true);
+      clone.querySelectorAll('.code-block-header, .code-header, .copy-btn, .copy-code, .margin, .ace_gutter, .line-numbers').forEach(el => el.remove());
+
+      // 提取代码行：兼容 Monaco (.view-line)、Ace (.ace-line, .ace_line) 与标准 pre/code
+      const lineElements = clone.querySelectorAll('.view-line, .ace-line, .ace_line');
       const code = doc.createElement('code');
-      const lines = block.querySelectorAll('.ace-line');
-      if (lines.length > 0) {
-        code.textContent = Array.from(lines).map(l => l.textContent.replace(/[\u200B\u200C\u200D\uFEFF]/g, '')).join('\n');
+
+      if (lineElements.length > 0) {
+        const lines = Array.from(lineElements).map(lineEl => {
+          return (lineEl.textContent || '').replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+        });
+        code.textContent = lines.join('\n');
       } else {
-        code.textContent = codeEl.textContent.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+        const codeEl = clone.querySelector('.view-lines, .lines-content, .code-block-content, .zone-container, pre, code') || clone;
+        code.textContent = (codeEl.textContent || '').replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
       }
+
       pre.appendChild(code);
       if (block.parentNode) block.parentNode.replaceChild(pre, block);
     });
@@ -354,47 +454,98 @@ class FeishuAdapter {
       if (block.parentNode) block.parentNode.replaceChild(bq, block);
     });
 
-    // 14. 附件文件块 (file / file_card)
-    container.querySelectorAll('[data-block-type="file"], .file-block, .file-card-wrapper').forEach(block => {
+    // 14. 附件文件块 (file / file_card) 提取完整元数据 (文件名、大小、图标、链接)
+    container.querySelectorAll('[data-block-type="file"], .file-block, .file-card-wrapper, .drive-file-card').forEach(block => {
       const nameEl = block.querySelector('.file-name, .file-title, .title-text, .drive-file-name') || block;
       const fileName = (nameEl.textContent || '附件文件').replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim();
+      const sizeEl = block.querySelector('.file-size, .extra-info, .size');
+      const sizeText = sizeEl ? ` (${sizeEl.textContent.trim()})` : '';
       const linkEl = block.querySelector('a') || block.closest('a');
       const fileUrl = linkEl ? linkEl.href : '#';
       const p = doc.createElement('p');
-      p.innerHTML = `📎 <strong>附件：</strong><a href="${fileUrl}">${fileName}</a>`;
+      p.innerHTML = `📎 <strong>附件：</strong><a href="${fileUrl}">${fileName}${sizeText}</a>`;
       if (block.parentNode) block.parentNode.replaceChild(p, block);
     });
 
-    // 15. 思维导图/白板/图表卡片 (mindnote / diagram / board)
-    container.querySelectorAll('[data-block-type="mindnote"], [data-block-type="diagram"], [data-block-type="board"]').forEach(block => {
+    // 15. 思维导图 / 流程图 / 白板 (mindnote / diagram / board)
+    container.querySelectorAll('[data-block-type="mindnote"], [data-block-type="diagram"], [data-block-type="board"], .mindnote-block, .diagram-block').forEach(block => {
       const titleEl = block.querySelector('.title, .mindnote-title, .diagram-title, .header-text');
-      const title = titleEl ? titleEl.textContent.trim() : '飞书思维导图/组件';
+      const title = titleEl ? titleEl.textContent.trim() : '思维导图/流程图组件';
       const img = block.querySelector('img');
+      const svg = block.querySelector('svg');
       const frag = doc.createDocumentFragment();
+
       const p = doc.createElement('p');
       p.innerHTML = `📊 <strong>[${title}]</strong>`;
       frag.appendChild(p);
-      if (img) frag.appendChild(img.cloneNode(true));
+
+      if (img) {
+        frag.appendChild(img.cloneNode(true));
+      }
+
+      // 提取思维导图文本节点树 (.mindmap-node-text, .node-content, .tree-node) 保留全文搜索与离线结构
+      const textNodes = Array.from(block.querySelectorAll('.mindmap-node-text, .mindmap-node, .node-text, .canvas-text-content'));
+      if (textNodes.length > 0) {
+        const details = doc.createElement('details');
+        const summary = doc.createElement('summary');
+        summary.textContent = `📋 展开导图文本大纲 (${textNodes.length} 个节点)`;
+        details.appendChild(summary);
+
+        const ul = doc.createElement('ul');
+        textNodes.forEach(node => {
+          const t = node.textContent.trim();
+          if (t && t.length > 0) {
+            const li = doc.createElement('li');
+            li.textContent = t;
+            ul.appendChild(li);
+          }
+        });
+        details.appendChild(ul);
+        frag.appendChild(details);
+      }
+
       if (block.parentNode) block.parentNode.replaceChild(frag, block);
     });
 
-    // 16. 多维表格与电子表格 (bitable / sheet)
-    container.querySelectorAll('[data-block-type="bitable"], [data-block-type="sheet"]').forEach(block => {
+    // 16. 多维表格与电子表格 (bitable / sheet) 穿透 Canvas 与数据网格
+    container.querySelectorAll('[data-block-type="bitable"], [data-block-type="sheet"], .bitable-block, .sheet-block').forEach(block => {
       const innerTable = block.querySelector('table');
       if (innerTable) {
         if (block.parentNode) block.parentNode.replaceChild(innerTable, block);
       } else {
-        const titleEl = block.querySelector('.bitable-title, .sheet-title, .card-title');
-        const title = titleEl ? titleEl.textContent.trim() : '多维表格';
-        const p = doc.createElement('p');
-        p.innerHTML = `📊 <strong>[数据表] ${title}</strong>`;
-        if (block.parentNode) block.parentNode.replaceChild(p, block);
+        // 尝试穿透网格行与列 (.grid-header, .grid-row, .table-row, .canvas-row)
+        const gridRows = block.querySelectorAll('.grid-header, .grid-row, .table-row, .canvas-row');
+        if (gridRows.length > 0) {
+          const table = doc.createElement('table');
+          const tbody = doc.createElement('tbody');
+          gridRows.forEach((r, rIdx) => {
+            const tr = doc.createElement('tr');
+            const cells = r.querySelectorAll('.grid-cell, .cell, .bitable-cell');
+            cells.forEach(c => {
+              const cellTag = (rIdx === 0 || r.classList.contains('grid-header')) ? 'th' : 'td';
+              const td = doc.createElement(cellTag);
+              td.textContent = c.textContent.trim();
+              tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+          });
+          table.appendChild(tbody);
+          if (block.parentNode) block.parentNode.replaceChild(table, block);
+        } else {
+          const titleEl = block.querySelector('.bitable-title, .sheet-title, .card-title, .title-text');
+          const title = titleEl ? titleEl.textContent.trim() : '多维数据表';
+          const linkEl = block.querySelector('a') || block.closest('a');
+          const link = linkEl ? linkEl.href : '';
+          const p = doc.createElement('p');
+          p.innerHTML = `📊 <strong>[数据表: ${title}]</strong>` + (link ? ` <a href="${link}">查看原始表格</a>` : '');
+          if (block.parentNode) block.parentNode.replaceChild(p, block);
+        }
       }
     });
 
     // 17. 数学公式 (equation & equation-inline)
     container.querySelectorAll('[data-block-type="equation"], .equation-block').forEach(eq => {
-      const formula = (eq.getAttribute('data-equation') || eq.textContent || '').replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim();
+      const formula = (eq.getAttribute('data-equation') || eq.getAttribute('data-latex') || eq.textContent || '').replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim();
       if (formula) {
         const p = doc.createElement('p');
         p.textContent = `$$${formula}$$`;
@@ -402,7 +553,7 @@ class FeishuAdapter {
       }
     });
     container.querySelectorAll('.equation-inline, [data-equation-inline]').forEach(eq => {
-      const formula = (eq.getAttribute('data-equation') || eq.textContent || '').replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim();
+      const formula = (eq.getAttribute('data-equation') || eq.getAttribute('data-latex') || eq.textContent || '').replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim();
       if (formula) {
         const span = doc.createElement('span');
         span.textContent = `$${formula}$`;
@@ -410,7 +561,44 @@ class FeishuAdapter {
       }
     });
 
-    // 18. 内联富文本样式语义化 (加粗/斜体/删除线/行内代码/Mention)
+    // 18. Mention 与双链引用 (@User / @Doc / @Date)
+    container.querySelectorAll('.docx-mention-doc, .mention-doc, [data-mention-type="doc"], [data-mention-type="wiki"]').forEach(el => {
+      const docTitle = el.textContent.replace(/[\u200B\u200C\u200D\uFEFF@]/g, '').trim();
+      if (docTitle) {
+        const span = doc.createElement('span');
+        span.textContent = ` [[${docTitle}]] `;
+        if (el.parentNode) el.parentNode.replaceChild(span, el);
+      }
+    });
+    container.querySelectorAll('.docx-mention-user, .mention-user, [data-mention-type="user"]').forEach(el => {
+      const userName = el.textContent.replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim();
+      if (userName) {
+        const span = doc.createElement('span');
+        span.textContent = ` ${userName.startsWith('@') ? userName : '@' + userName} `;
+        if (el.parentNode) el.parentNode.replaceChild(span, el);
+      }
+    });
+    container.querySelectorAll('.docx-mention-date, .mention-date, [data-mention-type="date"]').forEach(el => {
+      const dateVal = el.textContent.replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim();
+      if (dateVal) {
+        const span = doc.createElement('span');
+        span.textContent = ` 📅 ${dateVal} `;
+        if (el.parentNode) el.parentNode.replaceChild(span, el);
+      }
+    });
+
+    // 19. 文本荧光笔高亮 (Highlight / Mark)
+    container.querySelectorAll('.text-highlight, [data-highlight="true"], mark, span[style*="background"]').forEach(el => {
+      const style = (el.getAttribute('style') || '').toLowerCase();
+      const hasHighlight = el.classList.contains('text-highlight') || el.hasAttribute('data-highlight') || (style.includes('background') && (style.includes('rgba') || style.includes('rgb') || style.includes('#')));
+      if (hasHighlight && el.textContent.trim() && el.tagName !== 'MARK') {
+        const mark = doc.createElement('mark');
+        while (el.firstChild) mark.appendChild(el.firstChild);
+        if (el.parentNode) el.parentNode.replaceChild(mark, el);
+      }
+    });
+
+    // 20. 内联富文本样式语义化 (加粗/斜体/删除线/行内代码)
     container.querySelectorAll('.bold, [data-bold="true"], span[style*="font-weight: bold"], span[style*="font-weight: 700"]').forEach(el => {
       if (el.tagName !== 'STRONG' && el.tagName !== 'B') {
         const strong = doc.createElement('strong');

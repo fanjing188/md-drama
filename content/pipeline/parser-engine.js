@@ -32,13 +32,18 @@ class UniversalParserEngine {
       service.use(turndownPluginGfm.taskListItems);
     }
 
-    // 处理代码块语言
+    // 处理代码块语言与代码内容提取
     service.addRule('fencedCodeBlockWithLang', {
       filter: ['pre'],
       replacement: (content, node) => {
-        const lang = node.getAttribute('data-lang') || '';
-        const code = node.querySelector('code') ? node.querySelector('code').textContent : node.textContent;
-        return `\n\`\`\`${lang}\n${code.replace(/\n$/, '')}\n\`\`\`\n\n`;
+        const lang = node.getAttribute('data-lang') ||
+                     node.getAttribute('data-language') ||
+                     node.querySelector('code')?.getAttribute('data-lang') ||
+                     node.querySelector('code')?.getAttribute('data-language') ||
+                     '';
+        const codeNode = node.querySelector('code');
+        const code = codeNode ? codeNode.textContent : node.textContent;
+        return `\n\n\`\`\`${lang}\n${code.replace(/\n$/, '')}\n\`\`\`\n\n`;
       }
     });
 
@@ -91,13 +96,26 @@ class UniversalParserEngine {
       }
     });
 
+    // 处理高亮文本 (<mark> -> ==文本==)
+    service.addRule('markHighlight', {
+      filter: ['mark'],
+      replacement: (content) => {
+        const text = content.trim();
+        return text ? `==${text}==` : '';
+      }
+    });
+
     // 块引用与 Callout 规则
     service.addRule('blockquotes', {
       filter: 'blockquote',
       replacement: (content) => {
         let text = content.trim();
-        // 还原 Obsidian Callout 语法
-        text = text.replace(/\\\[!NOTE\\\]/g, '[!NOTE]').replace(/\*\*\[!NOTE\]\*\*/g, '[!NOTE]');
+        // 还原全类型 Obsidian Callout 语法 (NOTE, TIP, WARNING, DANGER, INFO, FAQ, BUG, EXAMPLE 等，含折叠 - / +)
+        text = text.replace(/\\\[!([A-Z0-9_-]+(?:[-+])?)\\\]/gi, '[!$1]')
+                   .replace(/\*\*\[!([A-Z0-9_-]+(?:[-+])?)(?:\]\*\*|\s*\]\*\*\s*)/gi, '[!$1] ')
+                   .replace(/\\\[!/g, '[!')
+                   .replace(/\*\*\[!([A-Z0-9_-]+(?:[-+])?)\s*([^\*\]]*)\*\*/gi, '[!$1] $2');
+
         // 空行(段落分隔)保留为 ">" 续行, 保证引用块/callout 不会被拆散
         const lines = text.split('\n').map(l => l.replace(/^>\s*/, ''));
         return '\n\n' + lines.map(l => l ? `> ${l}` : '>').join('\n') + '\n\n';
@@ -107,7 +125,7 @@ class UniversalParserEngine {
     return service;
   }
 
-  // 将不应被排版/双链改写的片段（frontmatter、代码块、行内代码、链接、图片、双链）
+  // 将不应被排版/双链改写的片段（frontmatter、代码块、行内代码、公式、链接、图片、双链、Callout 标识）
   // 暂存为占位符，处理完后再还原
   protectSyntax(text) {
     const stash = [];
@@ -122,13 +140,18 @@ class UniversalParserEngine {
     // 2. 围栏代码块
     t = t.replace(/```[\s\S]*?```/g, m => keep(m));
     t = t.replace(/^~~~[\s\S]*?~~~$/gm, m => keep(m));
-    // 3. 行内代码
-    t = t.replace(/`[^`\n]+`/g, m => keep(m));
-    // 4. 行内公式
+    // 3. 多行与单行数学公式环境 ($$...$$ 及 $...$)
+    t = t.replace(/\$\$[\s\S]*?\$\$/g, m => keep(m));
     t = t.replace(/\$[^$\n]+\$/g, m => keep(m));
-    // 5. 链接与图片（整个 [..](..) 结构，防止 URL 被插入空格）
+    // 4. Obsidian Callout 头部保护 (> [!NOTE] 等)
+    t = t.replace(/^>\s*\[![A-Za-z0-9_-]+(?:[-+])?\][^\n]*/gm, m => keep(m));
+    // 5. 行内高亮 (==高亮==)
+    t = t.replace(/==[^=\n]+==/g, m => keep(m));
+    // 6. 行内代码
+    t = t.replace(/`[^`\n]+`/g, m => keep(m));
+    // 7. 链接与图片（整个 [..](..) 结构，防止 URL 被插入空格）
     t = t.replace(/!?\[[^\]\n]*\]\([^)\n]*\)/g, m => keep(m));
-    // 6. Obsidian 双链与嵌入
+    // 8. Obsidian 双链与嵌入
     t = t.replace(/!?\[\[[^\]\n]+\]\]/g, m => keep(m));
     return { text: t, stash };
   }

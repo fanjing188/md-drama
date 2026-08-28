@@ -35,8 +35,8 @@ class YuqueAdapter {
     };
   }
 
-  // 语雀 lake 引擎使用自定义标签渲染正文 (ne-h2 / ne-p / ne-uli / ne-alert...)
-  // 将其规范化为标准 HTML 标签, 保证 Markdown 层级/列表/引用 1:1 还原
+  // 语雀 lake 引擎使用自定义标签渲染正文 (ne-h2 / ne-p / ne-uli / ne-alert / ne-card 等)
+  // 将其规范化为标准 HTML 标签, 保证 Markdown 层级/列表/引用/代码块 1:1 还原
   static normalizeLakeElements(container) {
     const doc = document;
     const unwrap = (el) => {
@@ -46,7 +46,73 @@ class YuqueAdapter {
       parent.removeChild(el);
     };
 
-    // 1. 标题: ne-h1..ne-h6 -> h1..h6 (先剔除锚点/折叠等噪声子节点)
+    // 1. 动态卡片解析 (ne-card): 提取代码块、数学公式、表格、附件等 JSON Payload
+    container.querySelectorAll('ne-card, [data-card-name]').forEach(card => {
+      const cardName = card.getAttribute('data-card-name') || card.getAttribute('data-card-type') || '';
+      const rawValue = card.getAttribute('data-card-value') || card.getAttribute('value') || '';
+      let cardData = null;
+      if (rawValue) {
+        try {
+          // 语雀通常做 URL 编码或 JSON 序列化
+          const decoded = rawValue.startsWith('data:') ? decodeURIComponent(rawValue.slice(5)) : (rawValue.includes('%7B') ? decodeURIComponent(rawValue) : rawValue);
+          cardData = JSON.parse(decoded);
+        } catch (e) {
+          try {
+            cardData = JSON.parse(decodeURIComponent(rawValue));
+          } catch (e2) { /* 忽略格式异常 */ }
+        }
+      }
+
+      // 1.1 代码块卡片 (codeblock)
+      if (cardName === 'codeblock' || cardName === 'code') {
+        const codeText = cardData?.code || cardData?.src || card.querySelector('pre, code')?.textContent || card.textContent;
+        const lang = cardData?.mode || cardData?.language || cardData?.lang || '';
+        const pre = doc.createElement('pre');
+        if (lang) pre.setAttribute('data-lang', lang);
+        const code = doc.createElement('code');
+        code.textContent = (codeText || '').trim();
+        pre.appendChild(code);
+        if (card.parentNode) card.parentNode.replaceChild(pre, card);
+        return;
+      }
+
+      // 1.2 数学公式卡片 (math / latex)
+      if (cardName === 'math' || cardName === 'latex') {
+        const codeText = cardData?.code || cardData?.src || card.getAttribute('data-formula') || card.textContent;
+        const isBlock = cardData?.display === 'block' || card.getAttribute('data-display') === 'block';
+        if (codeText) {
+          const el = doc.createElement(isBlock ? 'p' : 'span');
+          el.textContent = isBlock ? `$$${codeText.trim()}$$` : ` $${codeText.trim()}$ `;
+          if (card.parentNode) card.parentNode.replaceChild(el, card);
+          return;
+        }
+      }
+
+      // 1.3 表格卡片 (table)
+      if (cardName === 'table' && cardData?.html) {
+        const div = doc.createElement('div');
+        div.innerHTML = cardData.html;
+        if (card.parentNode) card.parentNode.replaceChild(div, card);
+        return;
+      }
+
+      // 1.4 脑图与流程图卡片 (mindmap / plantuml / flow)
+      if (cardName === 'mindmap' || cardName === 'diagram' || cardName === 'flow') {
+        const img = card.querySelector('img');
+        const title = cardData?.title || '语雀图表';
+        const p = doc.createElement('p');
+        p.innerHTML = `📊 <strong>[${title}]</strong>`;
+        if (img) {
+          const frag = doc.createDocumentFragment();
+          frag.appendChild(p);
+          frag.appendChild(img.cloneNode(true));
+          if (card.parentNode) card.parentNode.replaceChild(frag, card);
+          return;
+        }
+      }
+    });
+
+    // 2. 标题: ne-h1..ne-h6 -> h1..h6 (先剔除锚点/折叠等噪声子节点)
     container.querySelectorAll('ne-heading-ext, ne-heading-anchor, ne-heading-fold, ne-list-fold, ne-uli-i').forEach(el => el.remove());
     container.querySelectorAll('ne-h1,ne-h2,ne-h3,ne-h4,ne-h5,ne-h6').forEach(el => {
       const level = el.tagName.toLowerCase().replace('ne-h', '');
@@ -55,14 +121,14 @@ class YuqueAdapter {
       if (el.parentNode) el.parentNode.replaceChild(h, el);
     });
 
-    // 2. 段落: ne-p -> p
+    // 3. 段落: ne-p -> p
     container.querySelectorAll('ne-p').forEach(el => {
       const p = doc.createElement('p');
       while (el.firstChild) p.appendChild(el.firstChild);
       if (el.parentNode) el.parentNode.replaceChild(p, el);
     });
 
-    // 3. 列表: 相邻的 ne-uli 合并为一个 <ul>, 每个 ne-uli 变成 <li>
+    // 4. 列表: 相邻的 ne-uli 合并为一个 <ul>, 每个 ne-uli 变成 <li>
     const listItems = Array.from(container.querySelectorAll('ne-uli'));
     for (const item of listItems) {
       const li = doc.createElement('li');
@@ -87,17 +153,26 @@ class YuqueAdapter {
       if (li.parentNode && li.parentNode.tagName !== 'UL') groupSiblings(li);
     });
 
-    // 4. 高亮块: ne-alert -> blockquote (Callout)
+    // 5. 高亮块: ne-alert -> blockquote (智能匹配类型)
     container.querySelectorAll('ne-alert').forEach(el => {
+      const type = (el.getAttribute('type') || el.getAttribute('data-type') || 'info').toUpperCase();
+      let calloutType = 'NOTE';
+      if (type.includes('DANGER') || type.includes('ERROR')) calloutType = 'DANGER';
+      else if (type.includes('WARNING')) calloutType = 'WARNING';
+      else if (type.includes('SUCCESS') || type.includes('TIP')) calloutType = 'TIP';
+      else if (type.includes('INFO')) calloutType = 'INFO';
+
       const bq = doc.createElement('blockquote');
-      bq.appendChild(doc.createElement('p')).innerHTML = '<strong>[!NOTE]</strong>';
+      const p = doc.createElement('p');
+      p.innerHTML = `<strong>[!${calloutType}]</strong>`;
+      bq.appendChild(p);
       while (el.firstChild) bq.appendChild(el.firstChild);
       if (el.parentNode) el.parentNode.replaceChild(bq, el);
     });
 
-    // 5. 解开纯包装标签
-    container.querySelectorAll('ne-text, ne-heading-content, ne-uli-c, ne-card, ne-alert-hole').forEach(el => {
-      if (el.querySelector('img')) return; // 含图片的卡片保留内部结构
+    // 6. 解开纯包装标签
+    container.querySelectorAll('ne-text, ne-heading-content, ne-uli-c, ne-card, ne-alert-hole, ne-quote').forEach(el => {
+      if (el.querySelector('img, pre, table, blockquote')) return; // 复杂容器保留
       unwrap(el);
     });
 
@@ -129,13 +204,15 @@ class YuqueAdapter {
     // 规范化语雀 lake 引擎自定义标签
     YuqueAdapter.normalizeLakeElements(container);
 
-    // 修复语雀图片懒加载
+    // 修复语雀图片懒加载与高清大图
     container.querySelectorAll('img').forEach(img => {
-      const realSrc = img.getAttribute('data-src') ||
-                     img.getAttribute('data-origin-src') ||
-                     img.getAttribute('data-lake-raw-src') ||
-                     img.src;
+      let realSrc = img.getAttribute('data-src') ||
+                    img.getAttribute('data-origin-src') ||
+                    img.getAttribute('data-lake-raw-src') ||
+                    img.src;
       if (realSrc) {
+        // 语雀 oss 图片去掉缩放裁剪参数
+        realSrc = realSrc.replace(/x-oss-process=image%2Fresize[^&]+/i, '');
         img.setAttribute('src', realSrc);
       }
     });

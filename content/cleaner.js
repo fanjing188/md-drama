@@ -77,26 +77,35 @@ class ContentCleaner {
     return element;
   }
 
-  // 判断某行是否位于围栏代码块内部（避免清洗/裁剪代码内容）
+  // 判断某行是否位于围栏代码块或公式块内部（避免清洗/裁剪代码与公式内容）
   static splitByFence(text) {
     const lines = text.split('\n');
     const segments = []; // { code: bool, text: string }
     let inFence = false;
+    let fenceMarker = '';
     let current = [];
     let currentIsCode = false;
     for (const line of lines) {
-      const isFenceLine = /^\s*(```|~~~)/.test(line);
-      if (isFenceLine) {
-        segments.push({ code: currentIsCode, text: current.join('\n') });
-        current = [line];
-        currentIsCode = !inFence;
-        // 当 fence 关闭时，fence 行本身归属代码段
-        if (inFence) {
+      const trimmed = line.trim();
+      const match = trimmed.match(/^(```|~~~|\$\$)/);
+      if (match) {
+        const marker = match[1];
+        if (!inFence) {
+          segments.push({ code: currentIsCode, text: current.join('\n') });
+          current = [line];
+          currentIsCode = true;
+          inFence = true;
+          fenceMarker = marker;
+        } else if (marker === fenceMarker || (fenceMarker === '$$' && trimmed.endsWith('$$'))) {
+          current.push(line);
           segments.push({ code: true, text: current.join('\n') });
           current = [];
           currentIsCode = false;
+          inFence = false;
+          fenceMarker = '';
+        } else {
+          current.push(line);
         }
-        inFence = !inFence;
         continue;
       }
       current.push(line);
@@ -156,6 +165,9 @@ class ContentCleaner {
 
       // 修复 Turndown 错误转义的行首破折号 (\- -> -)
       t = t.replace(/^[ \t]*\\-([ \t]+)/gm, '-$1');
+
+      // 还原 Obsidian 双链与嵌入中被 Turndown 转义的方括号 (\[\[ -> [[, \]\] -> ]])
+      t = t.replace(/\\\[\\\[/g, '[[').replace(/\\\]\\\]/g, ']]');
 
       // 规范化无序列表符号后的空格 (如 "-   item" 压缩为标准 GFM "- item")
       t = t.replace(/^([ \t]*[-*+])[ \t]{2,}(?=\S)/gm, '$1 ');
