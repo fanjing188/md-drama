@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MD抓吗 - 新手配置向导</title>
+  <link rel="stylesheet" href="onboarding.css">
+</head>
+<body>
+  <div class="wizard-shell">
+    
+    <!-- 顶部品牌与标题 -->
+    <header class="wizard-header">
+      <div class="brand-cluster">
+        <div class="brand-glyph">
+          <img src="../icons/icon48.png" width="28" height="28" alt="MD抓吗" style="display:block; border-radius:3px;">
+        </div>
+        <div class="brand-title">
+          <h1>MD抓吗</h1>
+          <span class="wizard-tag">新手配置向导</span>
+        </div>
+      </div>
+      <p class="wizard-subtitle">只需 4 步，即可搞定知识库存储直连、网页划选与排版去噪规则 ✨</p>
+    </header>
+
+    <!-- 4 步骤横向指示器 (Stepper) -->
+    <nav class="wizard-stepper">
+      <div class="step-item active" data-step="1">
+        <div class="step-num">1</div>
+        <div class="step-label">存储与直连</div>
+      </div>
+      <div class="step-line"></div>
+      <div class="step-item" data-step="2">
+        <div class="step-num">2</div>
+        <div class="step-label">网页划选</div>
+      </div>
+      <div class="step-line"></div>
+      <div class="step-item" data-step="3">
+        <div class="step-num">3</div>
+        <div class="step-label">清洗与排版</div>
+      </div>
+      <div class="step-line"></div>
+      <div class="step-item" data-step="4">
+        <div class="step-num">4</div>
+        <div class="step-label">确认与生效</div>
+      </div>
+    </nav>
+
+    <!-- 主配置表单容器 -->
+    <main class="wizard-body">
+      <form id="wizardForm">
+
+        <!-- ================= 第 1 步：Obsidian 存储与直连配置 ================= -->
+        <section class="wizard-step-panel active" id="stepPanel1">
+          <div class="panel-card">
+            <div class="panel-card-header">
+              <span class="panel-icon">💾</span>
+              <div class="panel-meta">
+                <h2>第 1 步：Obsidian 存储与同步服务</h2>
+                <p>配置抓取的 Markdown 文章与本地图片如何存入您的知识库</p>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="obsidianSyncMethod">选择存储与同步模式</label>
+              <select id="obsidianSyncMethod">
+                <option value="rest_api">Obsidian Local REST API (推荐：秒级后台静默直连入库)</option>
+                <option value="downloads">直接导出 / 下载至本地目录 (开箱即用)</option>
+              </select>
+              <div class="form-hint">使用 REST API 需要在 Obsidian 的「第三方插件」中安装并启用 Local REST API 插件。</div>
+            </div>
+
+            <!-- REST API 专属配置卡片 -->
+            <div id="restApiConfigBox" class="sub-config-box">
+              <div class="tip-banner">
+                💡 <strong>推荐端口</strong>：填 <code>27123</code>（HTTP 协议标准端口），连接最稳定且无需信任自签名证书！
+              </div>
+
+              <div class="input-grid">
+                <div>
+                  <label for="restApiPort">REST API 端口</label>
+                  <input type="number" id="restApiPort" value="27123" placeholder="27123">
+                </div>
+                <div>
+                  <label for="restApiToken">API Token / Key</label>
+                  <input type="password" id="restApiToken" placeholder="粘贴 Obsidian 插件中的 API Key">
+                </div>
+              </div>
+
+              <div class="rest-actions-row">
+                <label class="checkbox-row">
+                  <input type="checkbox" id="restApiHttps">
+                  <span>启用 HTTPS 协议 (自签名证书)</span>
+                </label>
+
+                <button type="button" id="btnTestRestApi" class="btn-test">
+                  <span>⚡ 测试 API 连通性</span>
+                </button>
+              </div>
+
+              <div id="testApiResult" class="test-result-strip hidden"></div>
+            </div>
+
+            <div class="form-group" style="margin-top: 14px;">
+              <label for="vaultSavePath">默认整页归档相对路径</label>
+              <input type="text" id="vaultSavePath" value="03-知识库/网页剪藏" placeholder="例如：03-知识库/网页剪藏">
+              <div class="form-hint">抓取的文章将自动存入 Obsidian 仓库的该目录下。</div>
+            </div>
+
+            <div class="form-group">
+              <label for="attachmentFolder">图片附件保存统一子目录</label>
+              <input type="text" id="attachmentFolder" value="attachments" placeholder="attachments">
+              <div class="form-hint">网页下载的图片将保存在该目录下，避免图片失效。</div>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-row">
+                <input type="checkbox" id="autoSaveDirectly" checked>
+                <span>自动直接归档：抓取完成后直接存入知识库 (无需二次确认)</span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= 第 2 步：网页划选与保存模式配置 ================= -->
+        <section class="wizard-step-panel hidden" id="stepPanel2">
+          <div class="panel-card">
+            <div class="panel-card-header">
+              <span class="panel-icon">✨</span>
+              <div class="panel-meta">
+                <h2>第 2 步：网页划选圈选与剪藏模式</h2>
+                <p>配置在浏览网页时用鼠标划选文字的高亮交互与保存规则</p>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-row">
+                <input type="checkbox" id="enableSelectionBubble" checked>
+                <span class="checkbox-title">启用网页划选像素高亮圈选与「⚡ 抓下来」浮动小按钮</span>
+              </label>
+              <div class="form-hint">开启后，在任意网页划选文本，会自动出现像素虚线边框和快捷抓取按钮。</div>
+            </div>
+
+            <!-- 划选动效视觉展示卡片 -->
+            <div class="demo-bubble-card">
+              <div class="demo-outline">
+                <span class="demo-tag">[👾 已圈选]</span>
+                <span class="demo-text">“这是划选的一段文字，点击右侧按钮秒存笔记”</span>
+                <div class="demo-bubble">⚡ 抓下来</div>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 16px;">
+              <label for="selectionSaveMode">划选内容保存模式</label>
+              <select id="selectionSaveMode">
+                <option value="new_file">保存到指定目录下新文件 (默认)</option>
+                <option value="append_file">追加到指定现有文件末尾 (适合每日摘录 / Inbox)</option>
+              </select>
+            </div>
+
+            <div id="appendPathConfigBox" class="sub-config-box hidden">
+              <label for="selectionAppendFilePath">追加目标文件相对路径</label>
+              <input type="text" id="selectionAppendFilePath" value="03-知识库/网页剪藏/每日摘录.md" placeholder="例如：03-知识库/网页剪藏/每日摘录.md">
+              <div class="form-hint">每次划选抓取时，将以时间戳和引用块格式自动追加到此文件末尾。</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= 第 3 步：内容清洗去噪与图片排版 ================= -->
+        <section class="wizard-step-panel hidden" id="stepPanel3">
+          <div class="panel-card">
+            <div class="panel-card-header">
+              <span class="panel-icon">🧹</span>
+              <div class="panel-meta">
+                <h2>第 3 步：智能清洗去噪与排版规则</h2>
+                <p>自动过滤网页营销广告、点赞浮层，规范化 Markdown 格式</p>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-row">
+                <input type="checkbox" id="enableCleaning" checked>
+                <span>启用 DOM 智能去噪 (自动过滤广告容器、点赞打赏栏与无意义浮层)</span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-row">
+                <input type="checkbox" id="removeNoiseWords" checked>
+                <span>过滤常见引流套话 (自动剔除“关注公众号”、“一键三连”、“长按二维码”等)</span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-row">
+                <input type="checkbox" id="removeRedundantBlankLines" checked>
+                <span>自动清理多余连续空行与空引用块</span>
+              </label>
+            </div>
+
+            <div class="form-group" style="margin-top: 14px;">
+              <label for="imageHandling">图片资产本地化策略</label>
+              <select id="imageHandling">
+                <option value="download">全量并发下载至 Obsidian 附件目录 (推荐，彻底防盗链失效)</option>
+                <option value="external">保留原始网页外链</option>
+                <option value="base64">转换为内嵌 Base64 编码</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-row">
+                <input type="checkbox" id="includeFrontmatter" checked>
+                <span>自动注入 YAML Frontmatter (标题、来源 URL、抓取时间、标签)</span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-row">
+                <input type="checkbox" id="enableCallouts" checked>
+                <span>兼容 Obsidian Callout 高亮块语法 (&gt; [!NOTE])</span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= 第 4 步：确认生效与完成 ================= -->
+        <section class="wizard-step-panel hidden" id="stepPanel4">
+          <div class="panel-card">
+            <div class="panel-card-header">
+              <span class="panel-icon">🎉</span>
+              <div class="panel-meta">
+                <h2>第 4 步：配置清单确认与生效</h2>
+                <p>已就绪！请确认您的偏好配置，点击保存即可开启极速剪藏</p>
+              </div>
+            </div>
+
+            <!-- 快捷键卡片 -->
+            <div class="shortcut-banner">
+              <div class="shortcut-left">
+                <span class="shortcut-icon">⚡</span>
+                <span class="shortcut-title">全局静默抓取快捷键</span>
+              </div>
+              <div class="shortcut-pill">Alt + Shift + S</div>
+            </div>
+
+            <!-- 配置摘要汇总清单 -->
+            <div class="summary-list">
+              <div class="summary-row">
+                <span class="summary-label">同步模式:</span>
+                <span class="summary-val" id="summarySyncMode">Obsidian REST API 直连</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">整页保存路径:</span>
+                <span class="summary-val" id="summaryVaultPath">03-知识库/网页剪藏</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">划选保存模式:</span>
+                <span class="summary-val" id="summarySelectionMode">保存为独立新文件</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">图片本地化:</span>
+                <span class="summary-val" id="summaryImageMode">全量下载至附件目录</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">智能去噪:</span>
+                <span class="summary-val" id="summaryCleaning">已开启 (过滤营销套话与广告)</span>
+              </div>
+            </div>
+
+            <!-- 保存成功反馈提示 -->
+            <div id="saveSuccessAlert" class="save-success-box hidden">
+              <span class="success-glyph">✓</span>
+              <div class="success-text">
+                <strong>恭喜！配置已全部保存生效！</strong>
+                <p>您现在可以在任意网页按下 <kbd>Alt+Shift+S</kbd> 或划选文本点击「⚡ 抓下来」进行剪藏啦！</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </form>
+    </main>
+
+    <!-- 底部操作导航栏 -->
+    <footer class="wizard-footer">
+      <div class="footer-left">
+        <button type="button" id="btnPrevStep" class="btn-wizard hollow" disabled>上一步</button>
+      </div>
+
+      <div class="footer-center">
+        <span id="stepCounter" class="step-counter-text">第 1 / 4 步</span>
+      </div>
+
+      <div class="footer-right">
+        <button type="button" id="btnNextStep" class="btn-wizard primary">下一步 ➔</button>
+        <button type="button" id="btnFinish" class="btn-wizard finish hidden">💾 保存配置并开启剪藏</button>
+        <button type="button" id="btnCloseWizard" class="btn-wizard success hidden">🚀 开始使用 (关闭向导)</button>
+      </div>
+    </footer>
+
+  </div>
+
+  <script src="../utils/logger.js"></script>
+  <script src="onboarding.js"></script>
+</body>
+</html>

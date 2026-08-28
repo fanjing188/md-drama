@@ -38,6 +38,7 @@ const DEFAULT_SETTINGS = {
     "飞书",
     "生财有术"
   ],
+  enableDomainRouting: false,       // 默认不强制域名分流，严格遵循用户设置的 vaultSavePath 归档路径
   domainRouting: [
     { domain: "feishu.cn", path: "03-知识库/工作文档" },
     { domain: "larksuite.com", path: "03-知识库/工作文档" },
@@ -53,7 +54,7 @@ const DEFAULT_SETTINGS = {
 // 后台常驻任务跟踪池（即使切换标签页或关闭弹窗，任务也持续在后台完成并保存）
 const activeCrawlTasks = new Map();
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   chrome.storage.sync.get(null, (items) => {
     const newSettings = { ...DEFAULT_SETTINGS, ...items };
     chrome.storage.sync.set(newSettings);
@@ -71,11 +72,18 @@ chrome.runtime.onInstalled.addListener(() => {
     title: "MD抓吗：抓下来 (所选文字)",
     contexts: ["selection"]
   });
+
+  // 首次安装自动打开新手配置向导
+  if (details && details.reason === 'install') {
+    chrome.tabs.create({
+      url: chrome.runtime.getURL('onboarding/onboarding.html')
+    });
+  }
 });
 
-// 计算智能分流目录
+// 计算归档目录 (严格优先使用用户在偏好设置中配置的 vaultSavePath)
 function getTargetFolder(url, settings) {
-  if (settings.domainRouting && Array.isArray(settings.domainRouting)) {
+  if (settings.enableDomainRouting && settings.domainRouting && Array.isArray(settings.domainRouting)) {
     for (const route of settings.domainRouting) {
       if (route.domain && url && url.includes(route.domain)) {
         return route.path;
@@ -209,16 +217,26 @@ async function executeBackgroundCrawlWorkflow(tabId, tabUrl, useAutoScroll = tru
 
     const extractData = res.state.data;
     taskState.stage = 6;
-    taskState.percent = 100;
     taskState.data = extractData;
 
     // 若开启了自动直接保存（默认开启）
     if (settings.autoSaveDirectly) {
+      taskState.percent = 92;
       taskState.stageText = '正在自动归档至 Obsidian 知识库...';
+      taskState.savingDetail = '正在本地化图片资源与写入 Markdown...';
+      activeCrawlTasks.set(tabId, taskState);
+      
+      chrome.runtime.sendMessage({
+        action: 'workflowProgress',
+        state: taskState
+      }).catch(() => {});
+
       const saveRes = await saveToObsidianBackend(extractData, tabUrl, settings, tabId, false);
       taskState.status = 'saved';
+      taskState.percent = 100;
       taskState.saveResult = saveRes;
       taskState.stageText = '已成功归档至 Obsidian！';
+      taskState.savingDetail = '';
 
       chrome.tabs.sendMessage(tabId, {
         action: 'showToast',
@@ -227,6 +245,7 @@ async function executeBackgroundCrawlWorkflow(tabId, tabUrl, useAutoScroll = tru
       }).catch(() => {});
     } else {
       taskState.status = 'completed';
+      taskState.percent = 100;
       taskState.stageText = '全量解析完成！';
     }
 
@@ -306,6 +325,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'resetBackgroundTask') {
     const tabId = request.tabId || sender.tab?.id;
     activeCrawlTasks.delete(tabId);
+    sendResponse({ success: true });
+    return true;
+  }
+
+  // 打开新手配置向导
+  if (request.action === 'openOnboarding') {
+    chrome.tabs.create({
+      url: chrome.runtime.getURL('onboarding/onboarding.html')
+    });
     sendResponse({ success: true });
     return true;
   }
@@ -493,7 +521,23 @@ async function saveToObsidianBackend(extractData, url, settings, tabId, isSelect
     if (settings.obsidianSyncMethod === 'rest_api') {
       // 1. 全局统一图片附件保存
       if (settings.imageHandling === 'download' && extractData.images?.length > 0) {
+        let currentImgIdx = 0;
+        const totalImgs = extractData.images.length;
         for (const img of extractData.images) {
+          currentImgIdx++;
+          if (tabId) {
+            const saveState = {
+              tabId,
+              status: 'running',
+              stage: 6,
+              stageText: `正在归档至 Obsidian (图片 ${currentImgIdx}/${totalImgs})...`,
+              percent: Math.min(98, 92 + Math.round((currentImgIdx / totalImgs) * 5)),
+              savingDetail: `正在保存第 ${currentImgIdx}/${totalImgs} 张图片：${img.filename}`
+            };
+            activeCrawlTasks.set(tabId, saveState);
+            chrome.runtime.sendMessage({ action: 'workflowProgress', state: saveState }).catch(() => {});
+          }
+
           try {
             const imgPath = `${targetFolder}/${attachmentDirName}/${img.filename}`.replace(/\/+/g, '/');
             const imgBase64 = await fetchImageAsBase64(img.originalUrl, tabId);
@@ -511,6 +555,19 @@ async function saveToObsidianBackend(extractData, url, settings, tabId, isSelect
       }
 
       // 2. 写入 Markdown
+      if (tabId) {
+        const writeState = {
+          tabId,
+          status: 'running',
+          stage: 6,
+          stageText: '正在写入 Markdown 文档...',
+          percent: 98,
+          savingDetail: `正在写入文件：${fullPath}`
+        };
+        activeCrawlTasks.set(tabId, writeState);
+        chrome.runtime.sendMessage({ action: 'workflowProgress', state: writeState }).catch(() => {});
+      }
+
       await saveToObsidianRestApi({
         path: fullPath,
         content: extractData.markdown,
@@ -520,7 +577,22 @@ async function saveToObsidianBackend(extractData, url, settings, tabId, isSelect
     } else {
       // 导出文件模式
       if (settings.imageHandling === 'download' && extractData.images?.length > 0) {
+        let currentImgIdx = 0;
+        const totalImgs = extractData.images.length;
         for (const img of extractData.images) {
+          currentImgIdx++;
+          if (tabId) {
+            const saveState = {
+              tabId,
+              status: 'running',
+              stage: 6,
+              stageText: `正在导出图片资源 (${currentImgIdx}/${totalImgs})...`,
+              percent: Math.min(98, 92 + Math.round((currentImgIdx / totalImgs) * 5)),
+              savingDetail: `正在导出图片：${img.filename}`
+            };
+            activeCrawlTasks.set(tabId, saveState);
+            chrome.runtime.sendMessage({ action: 'workflowProgress', state: saveState }).catch(() => {});
+          }
           const imgPath = `Obsidian_Vault/${targetFolder}/${attachmentDirName}/${img.filename}`.replace(/\/+/g, '/');
           try {
             const imgBase64 = await fetchImageAsBase64(img.originalUrl, tabId);
@@ -541,6 +613,19 @@ async function saveToObsidianBackend(extractData, url, settings, tabId, isSelect
             }
           }
         }
+      }
+
+      if (tabId) {
+        const writeState = {
+          tabId,
+          status: 'running',
+          stage: 6,
+          stageText: '正在导出 Markdown 文件...',
+          percent: 98,
+          savingDetail: `正在生成下载：${fullPath}`
+        };
+        activeCrawlTasks.set(tabId, writeState);
+        chrome.runtime.sendMessage({ action: 'workflowProgress', state: writeState }).catch(() => {});
       }
 
       await handleDownload({
@@ -576,59 +661,73 @@ async function saveToObsidianBackend(extractData, url, settings, tabId, isSelect
   }
 }
 
-function sanitizePathSegment(seg) {
-  return String(seg)
+function sanitizePathSegment(seg, maxLen = 80) {
+  const cleaned = String(seg)
     .replace(/[\p{Cf}\u2028\u2029\u200B]/gu, '')
     .replace(/[\u0000-\u001F\u007F]/g, '')
-    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(/[\\/:*?"<>|#^\[\]]/g, '-')
     .replace(/^[\s.]+/, '')
     .replace(/[\s.]+$/, '')
     .trim();
+  if (cleaned.length > maxLen) {
+    return cleaned.slice(0, maxLen).trim();
+  }
+  return cleaned || 'untitled';
 }
 
 function sanitizeRelativePath(p) {
   const segs = String(p).split('/')
-    .map(sanitizePathSegment)
+    .map(s => sanitizePathSegment(s))
     .filter(s => s && s !== '.' && s !== '..');
   return segs.join('/') || 'untitled.md';
 }
 
-const BLOB_URL_THRESHOLD = 1_500_000;
+// Service Worker 兼容的文本转 Data URL (完全避免 FileReader 和 URL.createObjectURL)
+function textToDataUrl(text, mimeType = 'text/markdown;charset=utf-8') {
+  const bytes = new TextEncoder().encode(String(text));
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return `data:${mimeType};base64,${btoa(binary)}`;
+}
+
+// Service Worker 兼容的 ArrayBuffer 转 Data URL
+function arrayBufferToDataUrl(buffer, mimeType = 'application/octet-stream') {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return `data:${mimeType};base64,${btoa(binary)}`;
+}
+
+// Service Worker 兼容的 Blob 转 Data URL
+async function blobToDataUrl(blob, defaultMime = 'image/png') {
+  if (blob && typeof blob.arrayBuffer === 'function') {
+    const buffer = await blob.arrayBuffer();
+    return arrayBufferToDataUrl(buffer, blob.type || defaultMime);
+  }
+  throw new Error('当前环境不支持 Blob 数据读取');
+}
 
 async function buildCandidateUrls(content, mimeType, isDataUrl) {
   const urls = [];
-  const created = [];
-
-  if (!isDataUrl) {
-    try {
-      const objectUrl = URL.createObjectURL(new Blob([content], { type: mimeType }));
-      created.push(objectUrl);
-      urls.push(objectUrl);
-    } catch (e) {}
-
-    try {
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('dataURL 构造失败'));
-        reader.readAsDataURL(new Blob([content], { type: mimeType }));
-      });
-      urls.push(dataUrl);
-    } catch (e) {}
-  } else if (typeof content === 'string') {
-    if (content.startsWith('data:')) urls.push(content);
-    if (content.startsWith('data:') && content.length > BLOB_URL_THRESHOLD ||
-        !content.startsWith('data:') && content.startsWith('blob:')) {
-      try {
-        const res = await fetch(content);
-        const objectUrl = URL.createObjectURL(await res.blob());
-        created.push(objectUrl);
-        urls.unshift(objectUrl);
-      } catch (e) {}
+  if (isDataUrl && typeof content === 'string') {
+    if (content.startsWith('data:') || content.startsWith('http://') || content.startsWith('https://')) {
+      urls.push(content);
     }
+  } else if (typeof content === 'string') {
+    urls.push(textToDataUrl(content, mimeType));
+  } else if (content instanceof ArrayBuffer || content instanceof Uint8Array) {
+    urls.push(arrayBufferToDataUrl(content, mimeType));
+  } else if (content && typeof content.arrayBuffer === 'function') {
+    const buffer = await content.arrayBuffer();
+    urls.push(arrayBufferToDataUrl(buffer, mimeType));
   }
-
-  return { urls, created };
+  return { urls, created: [] };
 }
 
 function rawDownload(url, filename) {
@@ -654,7 +753,7 @@ async function handleDownload({ filename, content, mimeType = 'text/markdown;cha
     throw new Error(`Invalid filename: ${JSON.stringify(String(filename).slice(0, 80))}`);
   }
 
-  const { urls: candidateUrls, created } = await buildCandidateUrls(content, mimeType, isDataUrl);
+  const { urls: candidateUrls } = await buildCandidateUrls(content, mimeType, isDataUrl);
   if (!candidateUrls.length) {
     throw new Error(`无法构造下载源 (文件: ${safeFilename})`);
   }
@@ -666,20 +765,14 @@ async function handleDownload({ filename, content, mimeType = 'text/markdown;cha
   }
 
   let lastErr;
-  try {
-    for (const fname of nameCandidates) {
-      for (const url of candidateUrls) {
-        try {
-          return await rawDownload(url, fname);
-        } catch (e) {
-          lastErr = e;
-        }
+  for (const fname of nameCandidates) {
+    for (const url of candidateUrls) {
+      try {
+        return await rawDownload(url, fname);
+      } catch (e) {
+        lastErr = e;
       }
     }
-  } finally {
-    setTimeout(() => {
-      created.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) {} });
-    }, 30_000);
   }
 
   throw new Error(`${lastErr ? lastErr.message : '下载失败'} (文件: ${safeFilename})`);
@@ -688,7 +781,7 @@ async function handleDownload({ filename, content, mimeType = 'text/markdown;cha
 // 核心 Obsidian Local REST API 写入器 (精确逐级路径转义 + 智能多候选端点自适应)
 async function saveToObsidianRestApi({ path, content, isBinary, settings }) {
   if (!settings.restApiToken) {
-    throw new Error('未配置 Obsidian REST API Token，请先前往插件设置中填写 API Key');
+    throw new Error('未配置 Obsidian REST API Token，请先前往插件设置或新手向导中填写 API Key');
   }
 
   const safePath = sanitizeRelativePath(path);
@@ -724,15 +817,6 @@ async function saveToObsidianRestApi({ path, content, isBinary, settings }) {
   }
 
   throw new Error(lastErr?.message || '无法连接到 Obsidian REST API。请确保 Obsidian 已打开并启用 Local REST API 插件');
-}
-
-function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error('图片数据读取失败'));
-    reader.readAsDataURL(blob);
-  });
 }
 
 function dataUrlToBytes(dataUrl) {
@@ -776,6 +860,11 @@ async function fetchImageAsBase64(url, tabId, timeoutMs = 20000) {
 }
 
 async function ensureContentScripts(tabId) {
+  try {
+    const isAlive = await chrome.tabs.sendMessage(tabId, { action: 'ping' });
+    if (isAlive && isAlive.status === 'ok') return;
+  } catch (e) {}
+
   const scripts = [
     'utils/logger.js',
     'utils/sync-queue.js',
@@ -803,7 +892,7 @@ async function ensureContentScripts(tabId) {
     await chrome.scripting.insertCSS({
       target: { tabId },
       files: ['content/ui/bubble.css']
-    });
+    }).catch(() => {});
     await chrome.scripting.executeScript({
       target: { tabId },
       files: scripts

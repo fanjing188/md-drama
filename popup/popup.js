@@ -1,14 +1,11 @@
-// popup/popup.js - MD抓吗 可爱像素风交互、后台常驻任务接管与保存成功展示
-
-let currentExtractData = null;
-let currentSettings = null;
-let currentTabInfo = null;
-let currentSaveResult = null;
-const logger = new DramaLogger('PopupPixel');
+let isObsidianConnected = false;
+let isCheckingObsidian = false;
 
 document.addEventListener('DOMContentLoaded', async () => {
   currentSettings = await getSettings();
   await initCurrentPageInfo();
+  await checkObsidianApiStatus();
+  await restoreOngoingTaskState();
 
   // 绑定核心交互事件
   const btnPrimaryCrawl = document.getElementById('btnPrimaryCrawl');
@@ -21,6 +18,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnCopyMarkdown = document.getElementById('btnCopyMarkdown');
   const inputNewTag = document.getElementById('inputNewTag');
   const inputDocTitle = document.getElementById('inputDocTitle');
+  const btnRefreshApiStatus = document.getElementById('btnRefreshApiStatus');
+  const obsidianStatusBar = document.getElementById('obsidianStatusBar');
+
+  if (btnRefreshApiStatus) {
+    btnRefreshApiStatus.addEventListener('click', (e) => {
+      e.stopPropagation();
+      checkObsidianApiStatus(true);
+    });
+  }
+
+  if (obsidianStatusBar) {
+    obsidianStatusBar.addEventListener('click', () => {
+      if (!isObsidianConnected) {
+        if (!currentSettings?.restApiToken) {
+          chrome.runtime.openOptionsPage();
+        } else {
+          checkObsidianApiStatus(true);
+        }
+      }
+    });
+  }
 
   // 保存成功面板按钮
   const btnSuccessCopy = document.getElementById('btnSuccessCopy');
@@ -50,6 +68,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  const btnOnboarding = document.getElementById('btnOnboarding');
+  if (btnOnboarding) {
+    btnOnboarding.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'openOnboarding' });
+    });
+  }
+
   btnOptions.addEventListener('click', () => chrome.runtime.openOptionsPage());
   btnHistory.addEventListener('click', () => openHistoryDrawer());
   btnCloseHistory.addEventListener('click', () => closeHistoryDrawer());
@@ -58,8 +83,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderHistoryList();
   });
 
-  // 主抓取按钮：抓下来
-  btnPrimaryCrawl.addEventListener('click', () => runClipWorkflow(true));
+  // 主抓取按钮：抓下来 (未连通 Obsidian 接口时拦截并友好提醒)
+  btnPrimaryCrawl.addEventListener('click', async () => {
+    if (currentSettings?.obsidianSyncMethod === 'rest_api') {
+      if (!isObsidianConnected) {
+        // 先进行一次快速二次嗅探（防止用户刚启动 Obsidian 尚未刷新状态）
+        await checkObsidianApiStatus(false);
+      }
+
+      if (!isObsidianConnected) {
+        if (!currentSettings?.restApiToken) {
+          displayError('⚠️ 您启用了 Obsidian REST API 直连，但尚未配置 Token。请先点击右上角「设置」或「向导」填写 API Key！');
+          showFlyoutToast('⚠️ 未配置 API Token，请先设置', false);
+        } else {
+          displayError('⚠️ Obsidian 本地接口未连通！请先打开 Obsidian 客户端（并确保 Local REST API 插件已启用）后再抓取。');
+          showFlyoutToast('⚠️ 请先打开 Obsidian 客户端再操作', false);
+        }
+        return;
+      }
+    }
+
+    runClipWorkflow(true);
+  });
 
   btnCancelScroll.addEventListener('click', async () => {
     if (currentTabInfo && currentTabInfo.id) {
@@ -183,6 +228,55 @@ async function initCurrentPageInfo() {
   if (pageTitleEl) pageTitleEl.innerText = title;
 }
 
+// 检测 Obsidian 本地 REST API 接口连通性
+async function checkObsidianApiStatus(isManual = false) {
+  const statusBar = document.getElementById('obsidianStatusBar');
+  const dot = document.getElementById('apiStatusDot');
+  const text = document.getElementById('apiStatusText');
+  if (!statusBar || !dot || !text) return;
+
+  if (currentSettings?.obsidianSyncMethod !== 'rest_api') {
+    statusBar.classList.add('hidden');
+    isObsidianConnected = true;
+    return;
+  }
+
+  statusBar.classList.remove('hidden');
+  statusBar.className = 'api-status-corner';
+  dot.className = 'status-dot-pixel checking';
+  text.innerText = 'Obsidian服务：检测中';
+  isCheckingObsidian = true;
+
+  try {
+    const res = await chrome.runtime.sendMessage({ action: 'checkObsidianConnection' });
+    isCheckingObsidian = false;
+    if (res && res.connected) {
+      isObsidianConnected = true;
+      statusBar.className = 'api-status-corner status-connected';
+      dot.className = 'status-dot-pixel connected';
+      text.innerText = 'Obsidian服务：正常';
+      if (isManual) showFlyoutToast('✓ Obsidian 服务连接正常');
+      clearError();
+    } else {
+      isObsidianConnected = false;
+      statusBar.className = 'api-status-corner status-disconnected';
+      dot.className = 'status-dot-pixel disconnected';
+      if (!currentSettings?.restApiToken) {
+        text.innerText = 'Obsidian服务：未配置';
+      } else {
+        text.innerText = 'Obsidian服务：未连接';
+      }
+      if (isManual) showFlyoutToast('⚠️ Obsidian 未连接，请先打开客户端', false);
+    }
+  } catch (e) {
+    isCheckingObsidian = false;
+    isObsidianConnected = false;
+    statusBar.className = 'api-status-corner status-disconnected';
+    dot.className = 'status-dot-pixel disconnected';
+    text.innerText = 'Obsidian服务：未连接';
+  }
+}
+
 // 恢复后台常驻任务状态
 async function restoreOngoingTaskState() {
   if (!currentTabInfo || !currentTabInfo.id) return;
@@ -200,7 +294,7 @@ async function restoreOngoingTaskState() {
       pageInfoCard.classList.add('hidden');
       actionDock.classList.add('hidden');
       pipeline.classList.remove('hidden');
-      setPipelineStage(task.stage || 2, task.stageText || '后台深度抓取中...', task.percent || 40);
+      setPipelineStage(task.stage || 2, task.stageText || '后台深度抓取中...', task.percent || 40, task.savingDetail);
     } else if (task.status === 'saved' && task.data) {
       currentExtractData = task.data;
       currentSaveResult = task.saveResult;
@@ -264,17 +358,23 @@ function renderMarkdownPreview() {
   preview.innerHTML = html;
 }
 
-// 阶段节点与进度推进
-function setPipelineStage(stageNum, text, percent) {
+// 6 阶段节点与进度推进 (含保存中专属动态卡片激活)
+function setPipelineStage(stageNum, text, percent, savingDetail) {
   const statusText = document.getElementById('pipelineStatusText');
   const percentText = document.getElementById('pipelinePercent');
   const bar = document.getElementById('pipelineFill');
+  const pulseIcon = document.getElementById('pipelinePulseIcon');
+  const savingCard = document.getElementById('pipelineSavingCard');
+  const savingTitle = document.getElementById('savingStatusTitle');
+  const savingDetailEl = document.getElementById('savingStatusDetail');
+  const btnCancel = document.getElementById('btnCancelScroll');
 
   if (statusText) statusText.innerText = text;
   if (percentText) percentText.innerText = `${percent}%`;
   if (bar) bar.style.width = `${percent}%`;
 
-  for (let i = 1; i <= 5; i++) {
+  // 节点高亮演进 (1..6)
+  for (let i = 1; i <= 6; i++) {
     const node = document.getElementById(`stageNode${i}`);
     if (!node) continue;
     if (i < stageNum) {
@@ -287,6 +387,21 @@ function setPipelineStage(stageNum, text, percent) {
       node.className = 'stage-node';
       node.querySelector('.node-bullet').innerText = `${i}`;
     }
+  }
+
+  // 第 6 阶段归档保存中：激活保存专属动画特效
+  if (stageNum >= 6) {
+    if (pulseIcon) pulseIcon.innerText = '💾';
+    if (btnCancel) btnCancel.classList.add('hidden');
+    if (savingCard) {
+      savingCard.classList.remove('hidden');
+      if (savingTitle) savingTitle.innerText = text || '正在写入 Obsidian 知识库...';
+      if (savingDetailEl) savingDetailEl.innerText = savingDetail || '正在并发下载图片与本地化存储，请稍候...';
+    }
+  } else {
+    if (pulseIcon) pulseIcon.innerText = '👾';
+    if (btnCancel) btnCancel.classList.remove('hidden');
+    if (savingCard) savingCard.classList.add('hidden');
   }
 }
 
@@ -368,7 +483,7 @@ async function runClipWorkflow(useAutoScroll) {
   const progressListener = (msg) => {
     if (msg.action === 'workflowProgress' && msg.state) {
       const st = msg.state;
-      setPipelineStage(st.stage || 2, st.stageText || '深度解析中...', st.percent || 50);
+      setPipelineStage(st.stage || 2, st.stageText || '深度解析中...', st.percent || 50, st.savingDetail);
     }
   };
   chrome.runtime.onMessage.addListener(progressListener);
@@ -439,6 +554,7 @@ function resetPopupToHome() {
   document.getElementById('pageInfoCard').classList.remove('hidden');
   document.getElementById('actionDock').classList.remove('hidden');
   clearError();
+  checkObsidianApiStatus();
 }
 
 function showStudio(data) {

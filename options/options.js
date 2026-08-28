@@ -8,6 +8,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const appendPathConfig = document.getElementById('appendPathConfig');
   const saveStatus = document.getElementById('saveStatus');
 
+  // 0. 打开新手配置向导按钮
+  const btnOpenOnboarding = document.getElementById('btnOpenOnboarding');
+  if (btnOpenOnboarding) {
+    btnOpenOnboarding.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'openOnboarding' });
+    });
+  }
+
   // 1. Tab 切换逻辑 (点击对应 Tab 只展示对应的内容板块)
   const tabButtons = document.querySelectorAll('.tab-item');
   const tabPanels = document.querySelectorAll('.tab-panel');

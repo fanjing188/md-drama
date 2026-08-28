@@ -1,4 +1,4 @@
-// content/adapters/feishu.js - 飞书/Lark 文档深度解析 Adapter
+// content/adapters/feishu.js - 飞书/Lark 深度解析 Adapter (Docx / Wiki / Docs / File 全模块支持)
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -15,12 +15,14 @@ class FeishuAdapter {
                     document.querySelector('.title-text') ||
                     document.querySelector('[data-page-title]') ||
                     document.querySelector('.page-title') ||
-                    document.querySelector('.wiki-title');
+                    document.querySelector('.wiki-title') ||
+                    document.querySelector('.file-name') ||
+                    document.querySelector('.header-title');
 
     let title = titleEl ? (titleEl.textContent || '').trim() : '';
     // 页头 logo 的 <h1> 固定为 "飞书云文档", 不能当作文档标题
     if (!title || title === '飞书云文档' || title === 'Lark') {
-      title = (document.title || '').replace(/\s*[-|｜]\s*(飞书云文档|飞书|Lark)\s*$/, '').trim();
+      title = (document.title || '').replace(/\s*[-|｜_]\s*(飞书云文档|飞书|Lark|知识库|文档)\s*$/, '').trim();
     }
     if (!title) title = '飞书文档';
 
@@ -91,14 +93,13 @@ class FeishuAdapter {
     return (rawSrc && typeof rawSrc === 'string' && !rawSrc.startsWith('data:image/svg') && !rawSrc.startsWith('blob:')) ? rawSrc.trim() : '';
   }
 
-  // 飞书 docx 使用 data-block-type 标记块语义, 且大量使用布局表格与嵌套 div。
-  // 这里将其规范化为标准 HTML, 保证层级/列表/引用/表格/代码 1:1 还原。
+  // 飞书 docx / wiki 使用 data-block-type 与 render-unit-wrapper 标记块语义。
+  // 将其全面规范化为标准语义 HTML, 保证文字/标题/分栏/表格/公式/高亮块/列表 100% 完整还原。
   static normalizeDocxBlocks(container) {
     const doc = document;
 
     // 1. 清理噪声: 打印占位文案、AI速读/摘要、评论气泡、选区遮罩、光标、侧栏、零宽占位等
     const removeSelectors = [
-      // 飞书 AI 速读 / AI 摘要 / 智能提炼板块
       '[data-block-type="ai_digest"]',
       '[data-block-type="ai_summary"]',
       '[data-block-type="ai_quick_read"]',
@@ -132,7 +133,6 @@ class FeishuAdapter {
       '.drag-handle',
       '.docx-block-actions',
       '.docx-comment-portal',
-      // 图片块"附件不支持打印"等占位提示
       '.gpf-biz-action-manager-forbidden-placeholder',
       '.vmok-sidebar-container',
       '.help-block',
@@ -155,29 +155,37 @@ class FeishuAdapter {
       }
     });
 
-    // 2. 文档主标题: 拍平成纯文本 h1
-    container.querySelectorAll('.page-block-header h1, h1.page-block-content').forEach(h => {
+    // 2. 文档主标题: 拍平成标准 h1
+    container.querySelectorAll('.page-block-header h1, h1.page-block-content, .docx-title-text').forEach(h => {
       const text = (h.textContent || '').replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim();
-      if (!text) return;
+      if (!text || text === '飞书云文档' || text === 'Lark') return;
       const clean = doc.createElement('h1');
       clean.textContent = text;
-      h.parentNode.replaceChild(clean, h);
+      if (h.parentNode) h.parentNode.replaceChild(clean, h);
     });
 
-    // 3. 文本块: data-block-type="text" 的每个 .ace-line 转为 <p>
-    container.querySelectorAll('[data-block-type="text"]').forEach(block => {
-      const lines = block.querySelectorAll('.ace-line');
-      if (lines.length === 0) return;
+    // 3. 分栏布局块 (grid / grid_column): 将并排分栏解包为线性顺序排列
+    container.querySelectorAll('[data-block-type="grid"], .grid-block').forEach(grid => {
       const frag = doc.createDocumentFragment();
-      lines.forEach(line => {
-        const p = doc.createElement('p');
-        while (line.firstChild) p.appendChild(line.firstChild);
-        frag.appendChild(p);
-      });
+      const columns = grid.querySelectorAll('[data-block-type="grid_column"], .grid-column-block');
+      if (columns.length > 0) {
+        columns.forEach(col => {
+          while (col.firstChild) frag.appendChild(col.firstChild);
+        });
+      } else {
+        while (grid.firstChild) frag.appendChild(grid.firstChild);
+      }
+      if (grid.parentNode) grid.parentNode.replaceChild(frag, grid);
+    });
+
+    // 4. 同步块 (synced_block): 解包为常规子块
+    container.querySelectorAll('[data-block-type="synced_block"]').forEach(block => {
+      const frag = doc.createDocumentFragment();
+      while (block.firstChild) frag.appendChild(block.firstChild);
       if (block.parentNode) block.parentNode.replaceChild(frag, block);
     });
 
-    // 4. 标题块: heading1..heading9 -> h1..h6
+    // 5. 标题块: heading1..heading9 -> h1..h6
     container.querySelectorAll('[data-block-type^="heading"]').forEach(block => {
       const m = block.getAttribute('data-block-type').match(/^heading(\d)$/);
       if (!m) return;
@@ -189,25 +197,53 @@ class FeishuAdapter {
           while (line.firstChild) h.appendChild(line.firstChild);
         });
       } else {
-        h.textContent = (block.textContent || '').replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim();
+        const contentRoot = block.querySelector('.heading-block-content, .render-unit-wrapper') || block;
+        while (contentRoot.firstChild) h.appendChild(contentRoot.firstChild);
       }
       if (h.textContent.trim() && block.parentNode) block.parentNode.replaceChild(h, block);
     });
 
-    // 5. 高亮块: callout -> blockquote (Obsidian [!NOTE])
+    // 6. 文本块: data-block-type="text"
+    container.querySelectorAll('[data-block-type="text"]').forEach(block => {
+      const lines = block.querySelectorAll('.ace-line');
+      const frag = doc.createDocumentFragment();
+      if (lines.length > 0) {
+        lines.forEach(line => {
+          const p = doc.createElement('p');
+          while (line.firstChild) p.appendChild(line.firstChild);
+          frag.appendChild(p);
+        });
+      } else {
+        // 当无 .ace-line (新版 Docx 或 /file/ 预览) 时，直接提取子节点或内容
+        const contentRoot = block.querySelector('.text-block-content, .render-unit-wrapper') || block;
+        const p = doc.createElement('p');
+        while (contentRoot.firstChild) p.appendChild(contentRoot.firstChild);
+        frag.appendChild(p);
+      }
+      if (block.parentNode) block.parentNode.replaceChild(frag, block);
+    });
+
+    // 7. 高亮块 (callout / highlight-block) -> Obsidian [!NOTE] (带自定义 Emoji 识别)
     const calloutBlocks = Array.from(container.querySelectorAll('[data-block-type="callout"], .callout-block, .highlight-block'));
     const processedCallouts = [];
     for (const block of calloutBlocks) {
       if (processedCallouts.some(p => p.contains(block))) continue;
       processedCallouts.push(block);
+
+      const emojiEl = block.querySelector('.callout-emoji, .emoji-picker, .callout-icon');
+      const emoji = emojiEl ? (emojiEl.textContent || '').trim() : '💡';
+
       const bq = doc.createElement('blockquote');
-      bq.appendChild(doc.createElement('p')).innerHTML = '<strong>[!NOTE]</strong>';
-      const contentRoot = block.querySelector('.callout-block-children') || block;
+      const pHeader = doc.createElement('p');
+      pHeader.innerHTML = `<strong>[!NOTE] ${emoji}</strong>`;
+      bq.appendChild(pHeader);
+
+      const contentRoot = block.querySelector('.callout-block-children, .callout-content') || block;
       while (contentRoot.firstChild) bq.appendChild(contentRoot.firstChild);
       if (block.parentNode) block.parentNode.replaceChild(bq, block);
     }
 
-    // 6. 表格处理: 单列表格是卡片容器 -> 解包为正文; 多列表格保留为真实表格
+    // 8. 表格处理: 单列表格是卡片容器 -> 解包为正文; 多列表格规范化保留
     container.querySelectorAll('[data-block-type="table"]').forEach(block => {
       const table = block.querySelector('table');
       if (!table) return;
@@ -230,27 +266,31 @@ class FeishuAdapter {
       }
     });
 
-    // 7. 列表块: bullet/ordered -> ul/li, ol/li
+    // 9. 列表块: bullet/ordered -> ul/li, ol/li
     container.querySelectorAll('[data-block-type="bullet"]').forEach(block => {
       const li = doc.createElement('li');
       const lines = block.querySelectorAll('.ace-line');
       if (lines.length > 0) {
         lines.forEach(line => { while (line.firstChild) li.appendChild(line.firstChild); });
       } else {
-        li.textContent = (block.textContent || '').replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim();
+        const contentRoot = block.querySelector('.bullet-block-content, .render-unit-wrapper') || block;
+        while (contentRoot.firstChild) li.appendChild(contentRoot.firstChild);
       }
       if (block.parentNode) block.parentNode.replaceChild(li, block);
     });
+
     container.querySelectorAll('[data-block-type="ordered"]').forEach(block => {
       const li = doc.createElement('li');
       const lines = block.querySelectorAll('.ace-line');
       if (lines.length > 0) {
         lines.forEach(line => { while (line.firstChild) li.appendChild(line.firstChild); });
       } else {
-        li.textContent = (block.textContent || '').replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim();
+        const contentRoot = block.querySelector('.ordered-block-content, .render-unit-wrapper') || block;
+        while (contentRoot.firstChild) li.appendChild(contentRoot.firstChild);
       }
       if (block.parentNode) block.parentNode.replaceChild(li, block);
     });
+
     container.querySelectorAll('li').forEach(li => {
       if (li.parentNode && li.parentNode.tagName !== 'UL' && li.parentNode.tagName !== 'OL') {
         const ul = doc.createElement('ul');
@@ -259,7 +299,7 @@ class FeishuAdapter {
       }
     });
 
-    // 8. 任务清单 / Todo 块
+    // 10. 任务清单 / Todo 块
     container.querySelectorAll('[data-block-type="todo"], [data-block-type="task"]').forEach(block => {
       const checked = block.querySelector('input[type="checkbox"]:checked') ||
                       block.querySelector('.todo-checkbox-checked, .task-checkbox-checked, [aria-checked="true"]');
@@ -275,7 +315,7 @@ class FeishuAdapter {
       if (block.parentNode) block.parentNode.replaceChild(li, block);
     });
 
-    // 9. 代码块
+    // 11. 代码块 (code)
     container.querySelectorAll('[data-block-type="code"]').forEach(block => {
       const codeEl = block.querySelector('.code-block-content, .zone-container, pre') || block;
       const langAttr = block.getAttribute('data-lang') || block.querySelector('[data-lang]')?.getAttribute('data-lang') || '';
@@ -292,13 +332,13 @@ class FeishuAdapter {
       if (block.parentNode) block.parentNode.replaceChild(pre, block);
     });
 
-    // 10. 分割线
+    // 12. 分割线
     container.querySelectorAll('[data-block-type="divider"]').forEach(block => {
       const hr = doc.createElement('hr');
       if (block.parentNode) block.parentNode.replaceChild(hr, block);
     });
 
-    // 11. 引用块
+    // 13. 引用块 (quote / quote_container)
     container.querySelectorAll('[data-block-type="quote"], [data-block-type="quote_container"]').forEach(block => {
       const bq = doc.createElement('blockquote');
       const lines = block.querySelectorAll('.ace-line');
@@ -314,10 +354,96 @@ class FeishuAdapter {
       if (block.parentNode) block.parentNode.replaceChild(bq, block);
     });
 
+    // 14. 附件文件块 (file / file_card)
+    container.querySelectorAll('[data-block-type="file"], .file-block, .file-card-wrapper').forEach(block => {
+      const nameEl = block.querySelector('.file-name, .file-title, .title-text, .drive-file-name') || block;
+      const fileName = (nameEl.textContent || '附件文件').replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim();
+      const linkEl = block.querySelector('a') || block.closest('a');
+      const fileUrl = linkEl ? linkEl.href : '#';
+      const p = doc.createElement('p');
+      p.innerHTML = `📎 <strong>附件：</strong><a href="${fileUrl}">${fileName}</a>`;
+      if (block.parentNode) block.parentNode.replaceChild(p, block);
+    });
+
+    // 15. 思维导图/白板/图表卡片 (mindnote / diagram / board)
+    container.querySelectorAll('[data-block-type="mindnote"], [data-block-type="diagram"], [data-block-type="board"]').forEach(block => {
+      const titleEl = block.querySelector('.title, .mindnote-title, .diagram-title, .header-text');
+      const title = titleEl ? titleEl.textContent.trim() : '飞书思维导图/组件';
+      const img = block.querySelector('img');
+      const frag = doc.createDocumentFragment();
+      const p = doc.createElement('p');
+      p.innerHTML = `📊 <strong>[${title}]</strong>`;
+      frag.appendChild(p);
+      if (img) frag.appendChild(img.cloneNode(true));
+      if (block.parentNode) block.parentNode.replaceChild(frag, block);
+    });
+
+    // 16. 多维表格与电子表格 (bitable / sheet)
+    container.querySelectorAll('[data-block-type="bitable"], [data-block-type="sheet"]').forEach(block => {
+      const innerTable = block.querySelector('table');
+      if (innerTable) {
+        if (block.parentNode) block.parentNode.replaceChild(innerTable, block);
+      } else {
+        const titleEl = block.querySelector('.bitable-title, .sheet-title, .card-title');
+        const title = titleEl ? titleEl.textContent.trim() : '多维表格';
+        const p = doc.createElement('p');
+        p.innerHTML = `📊 <strong>[数据表] ${title}</strong>`;
+        if (block.parentNode) block.parentNode.replaceChild(p, block);
+      }
+    });
+
+    // 17. 数学公式 (equation & equation-inline)
+    container.querySelectorAll('[data-block-type="equation"], .equation-block').forEach(eq => {
+      const formula = (eq.getAttribute('data-equation') || eq.textContent || '').replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim();
+      if (formula) {
+        const p = doc.createElement('p');
+        p.textContent = `$$${formula}$$`;
+        if (eq.parentNode) eq.parentNode.replaceChild(p, eq);
+      }
+    });
+    container.querySelectorAll('.equation-inline, [data-equation-inline]').forEach(eq => {
+      const formula = (eq.getAttribute('data-equation') || eq.textContent || '').replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim();
+      if (formula) {
+        const span = doc.createElement('span');
+        span.textContent = `$${formula}$`;
+        if (eq.parentNode) eq.parentNode.replaceChild(span, eq);
+      }
+    });
+
+    // 18. 内联富文本样式语义化 (加粗/斜体/删除线/行内代码/Mention)
+    container.querySelectorAll('.bold, [data-bold="true"], span[style*="font-weight: bold"], span[style*="font-weight: 700"]').forEach(el => {
+      if (el.tagName !== 'STRONG' && el.tagName !== 'B') {
+        const strong = doc.createElement('strong');
+        while (el.firstChild) strong.appendChild(el.firstChild);
+        if (el.parentNode) el.parentNode.replaceChild(strong, el);
+      }
+    });
+    container.querySelectorAll('.italic, [data-italic="true"], span[style*="font-style: italic"]').forEach(el => {
+      if (el.tagName !== 'EM' && el.tagName !== 'I') {
+        const em = doc.createElement('em');
+        while (el.firstChild) em.appendChild(el.firstChild);
+        if (el.parentNode) el.parentNode.replaceChild(em, el);
+      }
+    });
+    container.querySelectorAll('.strikethrough, [data-strikethrough="true"], span[style*="line-through"]').forEach(el => {
+      if (el.tagName !== 'DEL' && el.tagName !== 'S') {
+        const del = doc.createElement('del');
+        while (el.firstChild) del.appendChild(el.firstChild);
+        if (el.parentNode) el.parentNode.replaceChild(del, el);
+      }
+    });
+    container.querySelectorAll('.inline-code, .text-inline-code, [data-inline-code="true"]').forEach(el => {
+      if (el.tagName !== 'CODE') {
+        const code = doc.createElement('code');
+        while (el.firstChild) code.appendChild(el.firstChild);
+        if (el.parentNode) el.parentNode.replaceChild(code, el);
+      }
+    });
+
     return container;
   }
 
-  // 寻找真正的滚动驱动容器
+  // 寻找真正的滚动驱动容器 (支持 /docx/, /wiki/, /docs/, /file/, /drive/ 全模式)
   static findPrimaryScroller() {
     const customSelectors = [
       '.bear-web-x-container',
@@ -325,7 +451,15 @@ class FeishuAdapter {
       '.bear-web-editor',
       '.doc-page-container',
       '.docx-document-view',
-      '.docx-viewer'
+      '.docx-viewer',
+      '.file-preview-container',
+      '.suite-doc-view-container',
+      '.drive-file-viewer',
+      '.drive-preview-body',
+      '.file-view-container',
+      '.client-render-container',
+      '.suite-view-docx-page',
+      '.docx-editor-wrapper'
     ];
     for (const sel of customSelectors) {
       const el = document.querySelector(sel);
@@ -346,7 +480,7 @@ class FeishuAdapter {
     return best || document.scrollingElement || document.documentElement || document.body;
   }
 
-  // 编辑器根节点
+  // 编辑器与文档根节点 (覆盖飞书全部文档与文件预览容器)
   static findEditorRoot() {
     return document.querySelector('[data-block-type="page"]') ||
            document.querySelector('.docx-page-block') ||
@@ -361,13 +495,51 @@ class FeishuAdapter {
            document.querySelector('.doc-page-container') ||
            document.querySelector('.feishu-document-content') ||
            document.querySelector('.doc-content') ||
+           document.querySelector('.suite-view-docx-page') ||
+           document.querySelector('.file-preview-content') ||
+           document.querySelector('.drive-file-preview-content') ||
            document.querySelector('.client-render-container') ||
            document.querySelector('#doc-bg');
   }
 
+  // 获取顶层块集合（严格只收割顶级块，杜绝将嵌套子节点作为兄弟节点重复收割）
+  static getTopLevelBlocks() {
+    const pageChildren = document.querySelector('.page-block-children, .docx-page-block, .suite-view-docx-page, .file-preview-content');
+    if (pageChildren && pageChildren.children.length > 0) {
+      const list = Array.from(pageChildren.children).filter(el => !el.classList.contains('bear-virtual-renderUnit-placeholder'));
+      if (list.length > 0) return list;
+    }
+
+    const allBlocks = Array.from(document.querySelectorAll('[data-block-type], .render-unit-wrapper'));
+    return allBlocks.filter(b => {
+      const bType = b.getAttribute('data-block-type');
+      if (bType === 'page' || bType?.startsWith('ai_') || bType === 'quick_read') return false;
+      if (b.closest && b.closest('.docx-ai-panel, .docx-ai-quick-read, .ai-digest-container, .ai-summary-block')) return false;
+
+      // 向上遍历父节点，若父节点中已有非 page 的 block，则当前元素属于嵌套子节点，不作为顶层块
+      let parent = b.parentElement;
+      while (parent && parent !== document.body) {
+        if (parent.hasAttribute('data-block-type') && parent.getAttribute('data-block-type') !== 'page') {
+          return false;
+        }
+        parent = parent.parentElement;
+      }
+      return true;
+    });
+  }
+
+  static getBlockUniqueId(el) {
+    return el.getAttribute('data-block-id') ||
+           el.getAttribute('data-record-id') ||
+           el.getAttribute('data-zone-id') ||
+           el.id ||
+           el.getAttribute('data-index') ||
+           `${el.getAttribute('data-block-type') || 'block'}_${(el.textContent || '').slice(0, 40)}`;
+  }
+
   // 飞书 docx 虚拟列表只渲染视口附近的区块，离开视口的区块会被卸载回收并替换为占位节点。
-  // 本方法通过平滑步进滚动，动态收割并缓存所有按自然顺序挂载的区块，最后拼装出完整的文档树。
-  static async harvestAllBlocks(maxDurationMs = 35000) {
+  // 本方法通过平滑步进滚动，动态收割并缓存所有按自然顺序挂载的顶层区块，最后拼装出完整的文档树。
+  static async harvestAllBlocks(maxDurationMs = 30000) {
     if (typeof window === 'undefined' || typeof document === 'undefined') return [];
 
     const scroller = FeishuAdapter.findPrimaryScroller();
@@ -386,41 +558,30 @@ class FeishuAdapter {
 
     const initialScrollTop = getScrollTop();
     const blockMap = new Map();
-    const blockList = [];
+    const orderedBlockIds = [];
 
     function harvest() {
-      const blocks = Array.from(document.querySelectorAll('[data-block-type]'));
-      for (const b of blocks) {
-        const bType = b.getAttribute('data-block-type') || '';
-        if (bType === 'page' || bType.startsWith('ai_') || bType === 'quick_read') continue;
-        if (b.closest && b.closest('.docx-ai-panel, .docx-ai-quick-read, .ai-digest-container, .ai-summary-block')) continue;
+      const topBlocks = FeishuAdapter.getTopLevelBlocks();
+      for (const b of topBlocks) {
+        const id = FeishuAdapter.getBlockUniqueId(b);
+        if (!id) continue;
 
-        const blockId = b.getAttribute('data-block-id') ||
-                        b.getAttribute('data-record-id') ||
-                        b.id ||
-                        b.getAttribute('data-zone-id');
-        if (!blockId) continue;
-
-        if (!blockMap.has(blockId)) {
-          const cloned = b.cloneNode(true);
-          blockMap.set(blockId, cloned);
-          blockList.push({ id: blockId, el: cloned });
+        if (!blockMap.has(id)) {
+          blockMap.set(id, b.cloneNode(true));
+          orderedBlockIds.push(id);
         } else {
           // 针对图片等懒加载元素：如果当前 DOM 中包含了更完整的信息（如 image-token 或有效 src），更新克隆
-          const existingEl = blockMap.get(blockId);
-          const hasNewToken = b.querySelector('[image-token]') || b.hasAttribute('image-token');
-          const existingHasToken = existingEl.querySelector('[image-token]') || existingEl.hasAttribute('image-token');
+          const existing = blockMap.get(id);
+          const hasNewToken = b.querySelector('[image-token], img[src]:not([src^="data:image/svg"])');
+          const existingHasToken = existing.querySelector('[image-token], img[src]:not([src^="data:image/svg"])');
           if (hasNewToken && !existingHasToken) {
-            const cloned = b.cloneNode(true);
-            blockMap.set(blockId, cloned);
-            const idx = blockList.findIndex(item => item.id === blockId);
-            if (idx !== -1) blockList[idx].el = cloned;
+            blockMap.set(id, b.cloneNode(true));
           }
         }
       }
     }
 
-    // 1. 优先收割当前视口区块
+    // 1. 优先收割当前视口顶层块
     harvest();
 
     const placeholders = document.querySelectorAll('.bear-virtual-renderUnit-placeholder');
@@ -435,7 +596,7 @@ class FeishuAdapter {
 
       // 从顶部开始步进下滚并持续收割
       setScrollTop(0);
-      await sleep(100);
+      await sleep(150);
       harvest();
 
       while (Date.now() - startTime < maxDurationMs) {
@@ -446,7 +607,7 @@ class FeishuAdapter {
         window.dispatchEvent(new Event('resize'));
         if (!isGlobal && scroller.dispatchEvent) scroller.dispatchEvent(new Event('scroll'));
 
-        await sleep(75);
+        await sleep(100);
         harvest();
 
         const totalH = getScrollHeight();
@@ -458,7 +619,7 @@ class FeishuAdapter {
           if (totalH === lastTotalHeight) {
             sameHeightCount++;
             if (sameHeightCount >= 3) break;
-            await sleep(200);
+            await sleep(250);
           } else {
             sameHeightCount = 0;
             lastTotalHeight = totalH;
@@ -473,7 +634,7 @@ class FeishuAdapter {
     setScrollTop(initialScrollTop);
     try { window.scrollTo(0, initialScrollTop); } catch(e) {}
 
-    return blockList.map(item => item.el);
+    return orderedBlockIds.map(id => blockMap.get(id)).filter(Boolean);
   }
 
   static async extractContent() {
@@ -487,14 +648,10 @@ class FeishuAdapter {
       console.warn('[md-drama] 飞书虚拟列表收割遇到异常，回退常规提取:', e);
     }
 
-    if (!editor && harvestedElements.length === 0) {
-      return GenericAdapter.extractContent();
-    }
+    let container = document.createElement('div');
+    container.className = 'docx-page-block';
 
-    let container;
     if (harvestedElements && harvestedElements.length > 0) {
-      container = document.createElement('div');
-      container.className = 'docx-page-block';
       harvestedElements.forEach(el => container.appendChild(el));
     } else if (editor) {
       container = editor.cloneNode(true);

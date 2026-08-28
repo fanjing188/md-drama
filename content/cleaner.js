@@ -47,7 +47,6 @@ class ContentCleaner {
     const noiseSelectors = [
       'nav', 'aside', 'footer',
       '[role="navigation"]', '[role="banner"]', '[role="contentinfo"]',
-      '[aria-hidden="true"]',
       '.advertisement', '.adsbygoogle', '.ad-container', '.banner-ad', '.ad',
       '.share-group', '.social-share', '.reward-section', '.like-btn-group',
       '.copyright-statement', '.qr-code', '.footer-guide', '.recommend-box',
@@ -68,24 +67,12 @@ class ContentCleaner {
       });
     } catch (e) { /* 跳过 */ }
 
-    // 移除隐藏或零尺寸元素
-    if (typeof window !== 'undefined' && window.getComputedStyle) {
-      element.querySelectorAll('*').forEach(el => {
-        try {
-          const style = window.getComputedStyle(el);
-          if (style.display === 'none' || style.visibility === 'hidden') {
-            el.remove();
-          }
-        } catch (e) { /* 脱离文档树的节点跳过 */ }
-      });
-    } else {
-      // 非浏览器环境（测试）退化为内联样式判断
-      element.querySelectorAll('*').forEach(el => {
-        if (el.style && (el.style.display === 'none' || el.style.visibility === 'hidden')) {
-          el.remove();
-        }
-      });
-    }
+    // 移除显式隐藏元素 (仅针对内联 style 或 HTML hidden 属性，严禁在脱离文档树的克隆节点上盲目调用 getComputedStyle)
+    element.querySelectorAll('*').forEach(el => {
+      if (el.hidden || (el.style && (el.style.display === 'none' || el.style.visibility === 'hidden'))) {
+        el.remove();
+      }
+    });
 
     return element;
   }

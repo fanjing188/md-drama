@@ -27,7 +27,7 @@
       </div>
     </header>
 
-    <!-- 当前页面基础信息卡片 -->
+    <!-- 1. 当前页面基础信息卡片 (目标内容区) -->
     <div id="pageInfoCard" class="page-info-card">
       <div class="page-info-top">
         <span id="pageSiteTag" class="site-tag">🌐 网页</span>
@@ -36,7 +36,7 @@
       <div id="pageTitlePreview" class="page-title-text" title="当前页面标题">正在获取网页信息...</div>
     </div>
 
-    <!-- 核心操作区 (点击抓下来后隐藏，展示抓取进度板块) -->
+    <!-- 2. 核心操作区 (主操作按钮 + 左右对称辅助工具条) -->
     <div id="actionDock" class="action-dock">
       <button id="btnPrimaryCrawl" class="hero-cta" title="开始全量深度抓取页面内容与图片并排版">
         <div class="cta-inner">
@@ -47,12 +47,25 @@
           <span class="cta-shortcut">Alt+Shift+S</span>
         </div>
       </button>
+
+      <!-- 底部对称辅助条 (左下角新手向导 + 右下角服务状态) -->
+      <div class="action-footer-row">
+        <button type="button" id="btnOnboarding" class="footer-pill-btn" title="打开新手配置向导">
+          <span class="pill-icon">📖</span>
+          <span>新手向导</span>
+        </button>
+
+        <div id="obsidianStatusBar" class="api-status-corner hidden" title="点击重新检测 Obsidian 服务状态">
+          <span id="apiStatusDot" class="status-dot-pixel checking"></span>
+          <span id="apiStatusText" class="api-status-pixel-text">Obsidian服务：检测中</span>
+        </div>
+      </div>
     </div>
 
-    <!-- 5 节点可爱像素流水线进度板块 (抓取中展示) -->
+    <!-- 6 节点可爱像素流水线进度板块 (抓取与保存中展示) -->
     <div id="pipelineContainer" class="pipeline-card hidden">
       <div class="pipeline-header">
-        <span class="pulse-indicator">👾</span>
+        <span class="pulse-indicator" id="pipelinePulseIcon">👾</span>
         <span id="pipelineStatusText" class="pipeline-label">正在探测页面结构...</span>
         <span id="pipelinePercent" class="pipeline-num">0%</span>
       </div>
@@ -60,7 +73,7 @@
         <div id="pipelineFill" class="pipeline-bar"></div>
       </div>
       
-      <!-- 5个状态演进节点 -->
+      <!-- 6个状态演进节点 (探测 -> 滚动 -> 重塑 -> 去噪 -> 排版 -> 归档) -->
       <div class="pipeline-stages">
         <div class="stage-node running" id="stageNode1">
           <div class="node-bullet">1</div>
@@ -81,6 +94,26 @@
         <div class="stage-node" id="stageNode5">
           <div class="node-bullet">5</div>
           <span class="node-name">排版</span>
+        </div>
+        <div class="stage-node" id="stageNode6">
+          <div class="node-bullet">6</div>
+          <span class="node-name">归档</span>
+        </div>
+      </div>
+
+      <!-- 保存中专属动态特效卡片 (文章长/图片多时提供清晰的保存动态反馈) -->
+      <div id="pipelineSavingCard" class="pipeline-saving-card hidden">
+        <div class="saving-anim-cluster">
+          <div class="saving-icon-bounce">💾</div>
+          <div class="saving-dots-pulse">
+            <span class="dot-p dot-1"></span>
+            <span class="dot-p dot-2"></span>
+            <span class="dot-p dot-3"></span>
+          </div>
+        </div>
+        <div class="saving-info-block">
+          <div id="savingStatusTitle" class="saving-title-text">正在写入 Obsidian 知识库...</div>
+          <div id="savingStatusDetail" class="saving-detail-text">正在并发下载图片与本地化存储，请稍候</div>
         </div>
       </div>
       

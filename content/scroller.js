@@ -87,6 +87,9 @@ class SmartScroller {
       // 触发可能存在的懒加载事件
       window.dispatchEvent(new Event('scroll'));
       window.dispatchEvent(new Event('resize'));
+      if (!isGlobal && container.dispatchEvent) {
+        container.dispatchEvent(new Event('scroll'));
+      }
 
       // 等待 DOM 响应与渲染
       await new Promise(r => setTimeout(r, this.options.interval));

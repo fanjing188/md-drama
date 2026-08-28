@@ -193,10 +193,11 @@ body.history-expanded {
   word-break: break-word;
 }
 
-/* 3. 核心操作区 */
+/* 3. 核心操作区 (主次分明：大黄色主行动按钮 + 底部次要状态附注) */
 .action-dock {
   display: flex;
   flex-direction: column;
+  gap: 7px;
 }
 
 .hero-cta {
@@ -220,6 +221,124 @@ body.history-expanded {
 .hero-cta:active {
   transform: translate(3px, 3px);
   box-shadow: 0 0 0 var(--pixel-border);
+}
+
+/* 底部对称辅助工具栏 (左下角新手向导 + 右下角服务状态) */
+.action-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 1px;
+  gap: 8px;
+}
+
+.footer-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1.5px solid var(--pixel-border);
+  box-shadow: 1.5px 1.5px 0 var(--pixel-border);
+  background-color: var(--pixel-bg-card);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--pixel-text);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.1s ease;
+}
+
+.footer-pill-btn:hover {
+  transform: translate(-0.5px, -0.5px);
+  box-shadow: 2px 2px 0 var(--pixel-border);
+  background-color: var(--pixel-yellow);
+}
+
+.footer-pill-btn:active {
+  transform: translate(1px, 1px);
+  box-shadow: 0.5px 0.5px 0 var(--pixel-border);
+}
+
+.footer-pill-btn .pill-icon {
+  font-size: 10px;
+}
+
+/* 右下角可爱像素徽章 (Obsidian 服务状态) */
+.api-status-corner {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1.5px solid var(--pixel-border);
+  box-shadow: 1.5px 1.5px 0 var(--pixel-border);
+  background-color: var(--pixel-bg-card);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.1s ease;
+}
+
+.api-status-corner:hover {
+  transform: translate(-0.5px, -0.5px);
+  box-shadow: 2px 2px 0 var(--pixel-border);
+}
+
+.api-status-corner:active {
+  transform: translate(1px, 1px);
+  box-shadow: 0.5px 0.5px 0 var(--pixel-border);
+}
+
+.status-dot-pixel {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  border: 1px solid var(--pixel-border);
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.status-dot-pixel.checking {
+  background-color: var(--pixel-yellow);
+  animation: apiPixelPulse 0.9s infinite alternate;
+}
+
+.status-dot-pixel.connected {
+  background-color: var(--pixel-green);
+}
+
+.status-dot-pixel.disconnected {
+  background-color: var(--pixel-coral);
+}
+
+@keyframes apiPixelPulse {
+  0% { transform: scale(0.85); opacity: 0.5; }
+  100% { transform: scale(1.15); opacity: 1; }
+}
+
+.api-status-pixel-text {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--pixel-text);
+  letter-spacing: -0.2px;
+}
+
+.api-status-corner.status-connected {
+  background-color: #E8FBF2;
+}
+
+.api-status-corner.status-connected .api-status-pixel-text {
+  color: #1E6B4A;
+}
+
+.api-status-corner.status-disconnected {
+  background-color: #FFEBEB;
+}
+
+.api-status-corner.status-disconnected .api-status-pixel-text {
+  color: #C0392B;
 }
 
 .cta-inner {
@@ -364,6 +483,89 @@ body.history-expanded {
 
 .stage-node.done .node-name {
   color: var(--pixel-green-dark);
+}
+
+/* 4.1 保存中专属动态特效卡片 */
+.pipeline-saving-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background-color: #E8F4FD;
+  border: 1.5px solid var(--pixel-border);
+  box-shadow: 1.5px 1.5px 0 var(--pixel-border);
+  border-radius: 4px;
+  margin-top: 2px;
+  animation: savingCardFadeIn 0.3s ease;
+}
+
+@keyframes savingCardFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.saving-anim-cluster {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.saving-icon-bounce {
+  font-size: 18px;
+  animation: savingIconPulse 0.9s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes savingIconPulse {
+  0% { transform: translateY(0) scale(0.95); }
+  100% { transform: translateY(-3px) scale(1.1); }
+}
+
+.saving-dots-pulse {
+  display: flex;
+  gap: 2px;
+}
+
+.dot-p {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background-color: #2563EB;
+  display: inline-block;
+  animation: dotPulse 1.2s infinite ease-in-out both;
+}
+
+.dot-1 { animation-delay: -0.32s; }
+.dot-2 { animation-delay: -0.16s; }
+.dot-3 { animation-delay: 0s; }
+
+@keyframes dotPulse {
+  0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+.saving-info-block {
+  flex: 1;
+  overflow: hidden;
+}
+
+.saving-title-text {
+  font-size: 11px;
+  font-weight: 800;
+  color: #1E40AF;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.saving-detail-text {
+  font-size: 10px;
+  color: #3B82F6;
+  font-weight: 600;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cancel-link {
