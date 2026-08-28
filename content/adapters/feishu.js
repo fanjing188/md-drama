@@ -17,6 +17,8 @@ class FeishuAdapter {
                     document.querySelector('.page-title') ||
                     document.querySelector('.wiki-title') ||
                     document.querySelector('.file-name') ||
+                    document.querySelector('.file-title') ||
+                    document.querySelector('.file-header .file-title') ||
                     document.querySelector('.header-title');
 
     let title = titleEl ? (titleEl.textContent || '').trim() : '';
@@ -647,7 +649,10 @@ class FeishuAdapter {
       '.file-view-container',
       '.client-render-container',
       '.suite-view-docx-page',
-      '.docx-editor-wrapper'
+      '.docx-editor-wrapper',
+      '.monaco-scrollable-element',
+      '.overflow-guard',
+      '.monaco-editor'
     ];
     for (const sel of customSelectors) {
       const el = document.querySelector(sel);
@@ -672,21 +677,23 @@ class FeishuAdapter {
   static findEditorRoot() {
     return document.querySelector('[data-block-type="page"]') ||
            document.querySelector('.docx-page-block') ||
+           document.querySelector('.page-block-children') ||
+           document.querySelector('.docx-page') ||
            document.querySelector('.bear-web-editor') ||
            document.querySelector('.docx-editor') ||
            document.querySelector('.bear-web-x-container .page-main-item.editor') ||
            document.querySelector('.bear-web-x-container .page-main') ||
-           document.querySelector('.page-block-children') ||
-           document.querySelector('.docx-page') ||
+           document.querySelector('.drive-file-viewer') ||
+           document.querySelector('.file-preview-content') ||
+           document.querySelector('.drive-file-preview-content') ||
            document.querySelector('.docx-document-view') ||
            document.querySelector('.docx-viewer') ||
            document.querySelector('.doc-page-container') ||
            document.querySelector('.feishu-document-content') ||
            document.querySelector('.doc-content') ||
            document.querySelector('.suite-view-docx-page') ||
-           document.querySelector('.file-preview-content') ||
-           document.querySelector('.drive-file-preview-content') ||
            document.querySelector('.client-render-container') ||
+           document.querySelector('.monaco-editor') ||
            document.querySelector('#doc-bg');
   }
 
@@ -826,6 +833,34 @@ class FeishuAdapter {
   }
 
   static async extractContent() {
+    // 1. 优先检测是否为飞书 Monaco Editor 文件预览模式 (/file/<token> 或云空间预览 Markdown / 文本 / 代码文件)
+    // 需确保不是标准 Docx 页面中嵌入的代码块，避免全局命中导致 Docx 页面其他板块丢失
+    const isDocxPage = !!document.querySelector('[data-block-type="page"], .docx-page-block, .page-block-children, .suite-view-docx-page');
+    const monacoFileViewer = document.querySelector('.drive-file-viewer .monaco-editor, .file-preview-content .monaco-editor, .file-view-container .monaco-editor, .drive-preview-body .monaco-editor');
+    const standaloneMonaco = !isDocxPage ? document.querySelector('.monaco-editor') : null;
+    const monacoEditor = monacoFileViewer || standaloneMonaco;
+
+    if (monacoEditor) {
+      const monacoClone = monacoEditor.cloneNode(true);
+      // 剔除行号和边缘遮罩 UI 元素
+      monacoClone.querySelectorAll('.margin, .margin-view-overlays, .line-numbers, .glyph-margin, .minimap').forEach(el => el.remove());
+      const viewLines = monacoClone.querySelectorAll('.view-line');
+      let rawLines = [];
+      if (viewLines.length > 0) {
+        rawLines = Array.from(viewLines).map(l => (l.textContent || '').replace(/[\u200B\u200C\u200D\uFEFF]/g, ''));
+      } else {
+        const textContent = monacoClone.querySelector('.view-lines')?.textContent || monacoClone.textContent || '';
+        rawLines = [textContent.replace(/[\u200B\u200C\u200D\uFEFF]/g, '')];
+      }
+      const fullText = rawLines.join('\n');
+      if (fullText.trim().length > 0) {
+        const pre = document.createElement('pre');
+        pre.setAttribute('data-raw-markdown', 'true');
+        pre.textContent = fullText;
+        return pre;
+      }
+    }
+
     const editor = FeishuAdapter.findEditorRoot();
 
     // 尝试执行虚拟列表收割

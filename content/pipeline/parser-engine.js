@@ -32,6 +32,12 @@ class UniversalParserEngine {
       service.use(turndownPluginGfm.taskListItems);
     }
 
+    // 原生 Markdown / 代码文件文本块直通，避免 Turndown 将 #、>、--- 等符号转义为 \#、\>、\---
+    service.addRule('rawMarkdown', {
+      filter: (node) => node.nodeName === 'PRE' && node.getAttribute('data-raw-markdown') === 'true',
+      replacement: (content, node) => `\n\n${node.textContent.trim()}\n\n`
+    });
+
     // 处理代码块语言与代码内容提取
     service.addRule('fencedCodeBlockWithLang', {
       filter: ['pre'],

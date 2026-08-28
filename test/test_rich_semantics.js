@@ -168,6 +168,51 @@ async function testFeishuRichSemantics() {
   console.log('✓ 飞书所有富文本与复杂语义块测试全部通过！\n');
 }
 
+async function testFeishuMonacoFilePreview() {
+  console.log('=== 1.1 飞书 Monaco Editor 文件预览模式 (/file/<token> / 云空间代码与 Markdown 预览) ===');
+  const html = `
+    <div class="file-header">
+      <div class="file-title">seo规范.md</div>
+    </div>
+    <div class="drive-file-viewer">
+      <div class="monaco-editor">
+        <div class="margin">
+          <div class="margin-view-overlays">
+            <div class="line-numbers">1</div>
+            <div class="line-numbers">2</div>
+            <div class="line-numbers">3</div>
+            <div class="line-numbers">4</div>
+            <div class="line-numbers">5</div>
+          </div>
+        </div>
+        <div class="monaco-scrollable-element">
+          <div class="view-lines">
+            <div class="view-line"><span># AI 工具落地页打造规范文档</span></div>
+            <div class="view-line"><span>> 适用范围：英语（欧美）/ 日语 / 韩语 多语言 AI 工具产品落地页</span></div>
+            <div class="view-line"><span>---</span></div>
+            <div class="view-line"><span>| 原则 | 说明 |</span></div>
+            <div class="view-line"><span>|------|------|</span></div>
+            <div class="view-line"><span>| **用户意图优先** | 每个模块回答用户一个核心问题 |</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const win = createEnv(html, 'https://gbeb2lcdsd.feishu.cn/file/AMubbul8qo0MWrxFtFWczAY6nSf');
+  const extractor = new win.DramaExtractor();
+  const res = await extractor.extract();
+  const md = res.markdown;
+  console.log('飞书 Monaco 预览解析 Markdown 结果:\n', md);
+
+  assert(md.includes('# AI 工具落地页打造规范文档'), 'Markdown 标题未保留或被错误转义为 \\#');
+  assert(md.includes('> 适用范围：英语（欧美）/ 日语 / 韩语'), 'Markdown 引用块未保留或被转义为 \\>');
+  assert(md.includes('---'), '水平分割线未保留或被转义为 \\---');
+  assert(md.includes('| 原则 | 说明 |'), 'Markdown 表格未保留');
+  assert(!md.includes('line-numbers'), 'Monaco 行号未被清理');
+  console.log('✓ 飞书 Monaco Editor 文件预览提取与 Markdown 直通解析测试通过！\n');
+}
+
 async function testWechatSvgPenetration() {
   console.log('=== 2. 微信公众号 SVG foreignObject 穿透与多媒体组件测试 ===');
   const html = `
@@ -304,6 +349,7 @@ async function testShengcaiQaAndMedia() {
 async function run() {
   try {
     await testFeishuRichSemantics();
+    await testFeishuMonacoFilePreview();
     await testWechatSvgPenetration();
     await testYuqueLakeJsonPayload();
     await testNotionToggleAndTable();

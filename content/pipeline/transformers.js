@@ -447,3 +447,8 @@ class TransformersRegistry {
 if (typeof window !== 'undefined') {
   window.TransformersRegistry = TransformersRegistry;
 }
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { TransformersRegistry };
+}
+
