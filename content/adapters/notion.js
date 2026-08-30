@@ -15,12 +15,23 @@ class NotionAdapter {
                     document.querySelector('h1');
     const title = (titleEl ? (titleEl.textContent || '').trim() : '') || document.title;
 
+    const tags = ['Notion', '知识库'];
+    if (typeof AdapterUtils !== 'undefined') {
+      return AdapterUtils.cleanMetadata({
+        title: title || 'Notion Page',
+        author: 'Notion User',
+        date: new Date().toISOString().split('T')[0],
+        source: window.location.href,
+        tags
+      });
+    }
+
     return {
       title: (title || 'Notion Page').trim().replace(/[/\\?%*:|"<>]/g, '-'),
       author: 'Notion User',
       date: new Date().toISOString().split('T')[0],
       source: window.location.href,
-      tags: ['Notion', '知识库']
+      tags: tags
     };
   }
 

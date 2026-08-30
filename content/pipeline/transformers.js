@@ -381,7 +381,66 @@ class TransformersRegistry {
       }
     });
 
-    // 11. 块级子元素链接拍平: <a> 内含 div/p 等块级结构时 (Notion 卡片链接等),
+    // 11. SVG foreignObject 复杂排版穿透 (微信/知乎/语雀流程图与富文本)
+    this.register({
+      name: 'svg-foreignobject-penetrater',
+      match: (node) => node.tagName === 'SVG' && !!node.querySelector('foreignObject'),
+      transform: (node) => {
+        const foreignObjects = node.querySelectorAll('foreignObject');
+        if (foreignObjects.length > 0) {
+          const frag = document.createDocumentFragment();
+          foreignObjects.forEach(fo => {
+            while (fo.firstChild) frag.appendChild(fo.firstChild);
+          });
+          if (node.parentNode) node.parentNode.replaceChild(frag, node);
+        }
+      }
+    });
+
+    // 12. 音频与视频多媒体卡片规范化 (<audio>, <video>, mpvoice, voice_wrapper 等)
+    this.register({
+      name: 'media-card-normalizer',
+      match: (node) => {
+        const tag = node.tagName;
+        if (tag === 'AUDIO' || tag === 'VIDEO' || tag === 'MPVOICE') return true;
+        if (!node.classList) return false;
+        return node.classList.contains('voice_wrapper') ||
+               node.classList.contains('audio-player') ||
+               node.classList.contains('video-player') ||
+               node.classList.contains('js_audio_wrapper');
+      },
+      transform: (node) => {
+        const tag = node.tagName;
+        if (tag === 'AUDIO' || node.classList?.contains('voice_wrapper') || node.classList?.contains('audio-player') || tag === 'MPVOICE') {
+          const src = node.getAttribute('src') || node.getAttribute('data-src') || node.querySelector('source')?.getAttribute('src') || '';
+          const name = node.getAttribute('name') || node.querySelector('.voice_title, .title')?.textContent?.trim() || '音频内容';
+          const p = document.createElement('p');
+          p.innerHTML = src ? `🎵 <strong>[音频: ${name}]</strong> <a href="${src}">点击收听</a>` : `🎵 <strong>[音频: ${name}]</strong>`;
+          if (node.parentNode) node.parentNode.replaceChild(p, node);
+        } else if (tag === 'VIDEO' || node.classList?.contains('video-player')) {
+          const src = node.getAttribute('src') || node.getAttribute('data-src') || node.querySelector('source')?.getAttribute('src') || '';
+          const p = document.createElement('p');
+          p.innerHTML = src ? `🎬 <strong>[视频]</strong> <a href="${src}">${src}</a>` : `🎬 <strong>[视频播放器]</strong>`;
+          if (node.parentNode) node.parentNode.replaceChild(p, node);
+        }
+      }
+    });
+
+    // 13. 图片真实源探测与懒加载修复 (使用 AdapterUtils.detectImageSrc)
+    this.register({
+      name: 'image-source-normalizer',
+      match: (node) => node.tagName === 'IMG',
+      transform: (node) => {
+        if (typeof AdapterUtils !== 'undefined' && AdapterUtils.detectImageSrc) {
+          const bestSrc = AdapterUtils.detectImageSrc(node);
+          if (bestSrc && bestSrc !== node.getAttribute('src')) {
+            node.setAttribute('src', bestSrc);
+          }
+        }
+      }
+    });
+
+    // 14. 块级子元素链接拍平: <a> 内含 div/p 等块级结构时 (Notion 卡片链接等),
     //    用纯文本替换, 避免生成跨行断裂的 Markdown 链接
     this.register({
       name: 'block-link-flattener',
@@ -396,7 +455,7 @@ class TransformersRegistry {
       }
     });
 
-    // 12. 相对地址绝对化: a[href] 与 img 的相对地址转为绝对 URL,
+    // 15. 相对地址绝对化: a[href] 与 img 的相对地址转为绝对 URL,
     //    保证剪藏后的 Markdown 链接/图片在任何位置都能访问
     this.register({
       name: 'relative-url-absolutizer',

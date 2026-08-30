@@ -36,13 +36,24 @@ class ShengcaiAdapter {
 
     const author = readText(authorEl) || '生财圈友';
     const date = readText(timeEl) || new Date().toISOString().split('T')[0];
+    const tags = ['生财有术', '社群精华'];
+
+    if (typeof AdapterUtils !== 'undefined') {
+      return AdapterUtils.cleanMetadata({
+        title: title || '生财有术精华帖',
+        author,
+        date,
+        source: window.location.href,
+        tags
+      });
+    }
 
     return {
       title: title.trim().replace(/[/\\?%*:|"<>]/g, '-').slice(0, 50),
       author: author.trim(),
       date: date.trim(),
       source: window.location.href,
-      tags: ['生财有术', '社群精华']
+      tags
     };
   }
 

@@ -25,6 +25,16 @@ class WechatAdapter {
       tags.push('精选文章');
     }
 
+    if (typeof AdapterUtils !== 'undefined') {
+      return AdapterUtils.cleanMetadata({
+        title,
+        author,
+        date,
+        source: window.location.href,
+        tags
+      });
+    }
+
     return {
       title: (title || '微信公众号文章').trim().replace(/[/\\?%*:|"<>]/g, '-'),
       author: (author || '').trim(),

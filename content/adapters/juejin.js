@@ -22,12 +22,27 @@ class JuejinAdapter {
     const date = (dateEl ? (dateEl.textContent || '').trim() : '') ||
                  (metaDate ? (metaDate.getAttribute('content') || '').trim() : '');
 
+    const rawDate = (dateEl ? (dateEl.textContent || '').trim() : '') ||
+                    (metaDate ? (metaDate.getAttribute('content') || '').trim() : '');
+    const cleanDate = rawDate.replace(/发布于\s*/, '');
+    const tags = ['掘金', '技术博客'];
+
+    if (typeof AdapterUtils !== 'undefined') {
+      return AdapterUtils.cleanMetadata({
+        title: title || '掘金技术文章',
+        author: author || '掘金作者',
+        date: cleanDate,
+        source: window.location.href,
+        tags
+      });
+    }
+
     return {
       title: (title || '掘金技术文章').trim().replace(/[/\\?%*:|"<>]/g, '-'),
       author: (author || '掘金作者').trim(),
-      date: (date || '').trim().replace(/发布于\s*/, ''),
+      date: cleanDate,
       source: window.location.href,
-      tags: ['掘金', '技术博客']
+      tags
     };
   }
 

@@ -33,12 +33,25 @@ class ZhihuAdapter {
                      document.querySelector('meta[property="og:article:published_time"]');
     const date = metaDate ? (metaDate.getAttribute('content') || '') : '';
 
+    const cleanTitle = (title || '知乎内容').trim().replace(/\s*[-_|]\s*知乎\s*$/, '');
+    const tags = ['知乎', isArticle ? '专栏文章' : (isPin ? '知乎想法' : '问答精华')];
+
+    if (typeof AdapterUtils !== 'undefined') {
+      return AdapterUtils.cleanMetadata({
+        title: cleanTitle,
+        author: author || '知乎作者',
+        date,
+        source: window.location.href,
+        tags
+      });
+    }
+
     return {
-      title: (title || '知乎内容').trim().replace(/\s*[-_|]\s*知乎\s*$/, '').replace(/[/\\?%*:|"<>]/g, '-'),
+      title: cleanTitle.replace(/[/\\?%*:|"<>]/g, '-'),
       author: author.trim() || '知乎作者',
       date: (date || '').trim().slice(0, 10),
       source: window.location.href,
-      tags: ['知乎', isArticle ? '专栏文章' : (isPin ? '知乎想法' : '问答精华')]
+      tags
     };
   }
 

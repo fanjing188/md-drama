@@ -1,0 +1,385 @@
+/* popup/card-exporter.css - 优雅知识卡片与长图分享样式库 */
+
+/* 卡片容器外壳 (默认宽度 560px，高质感卡片布局) */
+.visual-card-frame {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 580px;
+  margin: 0 auto;
+  border-radius: 16px;
+  padding: 24px 28px 20px 28px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  line-height: 1.65;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
+}
+
+/* =========================================================================
+   1. 主题配色 (Themes)
+   ========================================================================= */
+
+/* 主题 1: Obsidian 经典黑曜暗紫 (默认) */
+.visual-card-frame.theme-obsidian {
+  background: linear-gradient(145deg, #13111c 0%, #1f1a30 55%, #181424 100%);
+  color: #f1f5f9;
+  border: 1px solid rgba(167, 139, 250, 0.25);
+}
+.theme-obsidian .card-main-title { color: #ffffff; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+.theme-obsidian .card-sub-pills { color: #a5b4fc; }
+.theme-obsidian .card-tag-pill { background: rgba(167, 139, 250, 0.15); color: #c4b5fd; border: 1px solid rgba(167, 139, 250, 0.3); }
+.theme-obsidian .card-section-divider { background: linear-gradient(90deg, transparent, rgba(167, 139, 250, 0.35), transparent); }
+.theme-obsidian .card-brand-pill { background: rgba(167, 139, 250, 0.2); color: #e0e7ff; }
+.theme-obsidian .card-source-badge { background: rgba(255, 255, 255, 0.08); color: #94a3b8; }
+.theme-obsidian .quote-symbol-lead, .theme-obsidian .quote-symbol-tail { color: rgba(167, 139, 250, 0.3); }
+.theme-obsidian .quote-paragraph { color: #e2e8f0; }
+.theme-obsidian .card-callout { background: rgba(30, 27, 46, 0.85); border-left: 4px solid #a78bfa; color: #f1f5f9; }
+.theme-obsidian .card-code-block { background: #0c0a12; border: 1px solid #2d2645; color: #e2e8f0; }
+.theme-obsidian .card-highlight { background: rgba(234, 179, 8, 0.35); color: #fef08a; }
+.theme-obsidian .footer-left-info .brand-name { color: #c4b5fd; }
+.theme-obsidian .footer-left-info .brand-slogan { color: #94a3b8; }
+.theme-obsidian .footer-left-info .source-hint { color: #64748b; }
+.theme-obsidian .footer-qr-wrap { background: #1f1a30; border: 1px solid rgba(167, 139, 250, 0.3); }
+
+/* 主题 2: macOS Minimal 极简浅色 */
+.visual-card-frame.theme-mac-light {
+  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
+}
+.theme-mac-light .card-main-title { color: #0f172a; }
+.theme-mac-light .card-sub-pills { color: #64748b; }
+.theme-mac-light .card-tag-pill { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+.theme-mac-light .card-section-divider { background: linear-gradient(90deg, transparent, #e2e8f0, transparent); }
+.theme-mac-light .card-brand-pill { background: #f1f5f9; color: #334155; }
+.theme-mac-light .card-source-badge { background: #f1f5f9; color: #64748b; }
+.theme-mac-light .quote-symbol-lead, .theme-mac-light .quote-symbol-tail { color: #cbd5e1; }
+.theme-mac-light .quote-paragraph { color: #334155; }
+.theme-mac-light .card-callout { background: #f8fafc; border-left: 4px solid #3b82f6; color: #1e293b; }
+.theme-mac-light .card-code-block { background: #f1f5f9; border: 1px solid #e2e8f0; color: #0f172a; }
+.theme-mac-light .card-highlight { background: #fef08a; color: #854d0e; }
+.theme-mac-light .footer-left-info .brand-name { color: #0f172a; }
+.theme-mac-light .footer-left-info .brand-slogan { color: #64748b; }
+.theme-mac-light .footer-left-info .source-hint { color: #94a3b8; }
+.theme-mac-light .footer-qr-wrap { background: #ffffff; border: 1px solid #e2e8f0; }
+
+/* 主题 3: Vintage Paper 复古羊皮纸书香 */
+.visual-card-frame.theme-vintage-paper {
+  background: #f6f1e8;
+  color: #2c251e;
+  border: 1px solid #d9cdbd;
+}
+.theme-vintage-paper .card-main-title { color: #1e1711; font-family: "Songti SC", "Source Han Serif SC", Georgia, serif; }
+.theme-vintage-paper .card-sub-pills { color: #7c6f62; }
+.theme-vintage-paper .card-tag-pill { background: #eae1d2; color: #5a4f43; border: 1px solid #cebfac; }
+.theme-vintage-paper .card-section-divider { background: linear-gradient(90deg, transparent, #c7b6a1, transparent); }
+.theme-vintage-paper .card-brand-pill { background: #e8ded0; color: #43392f; }
+.theme-vintage-paper .card-source-badge { background: #eae1d2; color: #635649; }
+.theme-vintage-paper .quote-symbol-lead, .theme-vintage-paper .quote-symbol-tail { color: #c4b5a2; }
+.theme-vintage-paper .quote-paragraph { color: #382e25; font-family: "Songti SC", "Source Han Serif SC", Georgia, serif; }
+.theme-vintage-paper .card-callout { background: #ede4d6; border-left: 4px solid #8c6d48; color: #2c251e; }
+.theme-vintage-paper .card-code-block { background: #eae0d0; border: 1px solid #d2c3af; color: #231b14; }
+.theme-vintage-paper .card-highlight { background: #f3d79b; color: #4e3505; }
+.theme-vintage-paper .footer-left-info .brand-name { color: #2c251e; font-family: "Songti SC", Georgia, serif; }
+.theme-vintage-paper .footer-left-info .brand-slogan { color: #6e6153; }
+.theme-vintage-paper .footer-left-info .source-hint { color: #8c7d6e; }
+.theme-vintage-paper .footer-qr-wrap { background: #f6f1e8; border: 1px solid #cebfac; }
+
+/* 主题 4: Cyber Tokyo 赛博霓虹暗黑 */
+.visual-card-frame.theme-cyber-tokyo {
+  background: linear-gradient(145deg, #090d16 0%, #111827 60%, #0f172a 100%);
+  color: #e2e8f0;
+  border: 1px solid #00f0ff44;
+}
+.theme-cyber-tokyo .card-main-title { color: #38bdf8; text-shadow: 0 0 12px rgba(56, 189, 248, 0.4); }
+.theme-cyber-tokyo .card-sub-pills { color: #94a3b8; }
+.theme-cyber-tokyo .card-tag-pill { background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+.theme-cyber-tokyo .card-section-divider { background: linear-gradient(90deg, transparent, #38bdf8, transparent); }
+.theme-cyber-tokyo .card-brand-pill { background: rgba(236, 72, 153, 0.2); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.4); }
+.theme-cyber-tokyo .card-source-badge { background: rgba(255, 255, 255, 0.06); color: #00f0ff; }
+.theme-cyber-tokyo .quote-symbol-lead, .theme-cyber-tokyo .quote-symbol-tail { color: rgba(236, 72, 153, 0.4); }
+.theme-cyber-tokyo .quote-paragraph { color: #f1f5f9; }
+.theme-cyber-tokyo .card-callout { background: rgba(15, 23, 42, 0.9); border-left: 4px solid #ec4899; color: #f8fafc; }
+.theme-cyber-tokyo .card-code-block { background: #030712; border: 1px solid #1f2937; color: #38bdf8; }
+.theme-cyber-tokyo .card-highlight { background: rgba(236, 72, 153, 0.35); color: #fbcfe8; }
+.theme-cyber-tokyo .footer-left-info .brand-name { color: #38bdf8; }
+.theme-cyber-tokyo .footer-left-info .brand-slogan { color: #94a3b8; }
+.theme-cyber-tokyo .footer-left-info .source-hint { color: #64748b; }
+.theme-cyber-tokyo .footer-qr-wrap { background: #111827; border: 1px solid rgba(56, 189, 248, 0.4); }
+
+/* =========================================================================
+   2. 头部栏 (Header)
+   ========================================================================= */
+.card-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.mac-dots {
+  display: flex;
+  gap: 6px;
+}
+.mac-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.mac-dot.red { background: #ff5f56; }
+.mac-dot.yellow { background: #ffbd2e; }
+.mac-dot.green { background: #27c93f; }
+
+.card-source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.card-brand-pill {
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* =========================================================================
+   3. 标题与元数据 (Meta)
+   ========================================================================= */
+.card-main-title {
+  margin: 0 0 12px 0;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+.card-sub-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.card-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.card-tag-pill {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.card-section-divider {
+  height: 1px;
+  width: 100%;
+  margin: 16px 0 20px 0;
+}
+
+/* =========================================================================
+   4. 正文呈现 (Body - Quote / Outline / Full)
+   ========================================================================= */
+.card-body-section {
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+/* 金句卡片模式 */
+.quote-card-cluster {
+  position: relative;
+  padding: 8px 12px;
+}
+.quote-symbol-lead {
+  font-size: 48px;
+  line-height: 1;
+  font-family: Georgia, serif;
+  margin-bottom: -16px;
+}
+.quote-symbol-tail {
+  font-size: 48px;
+  line-height: 1;
+  font-family: Georgia, serif;
+  text-align: right;
+  margin-top: -16px;
+}
+.quote-paragraph {
+  margin: 10px 0;
+  font-size: 15px;
+  line-height: 1.75;
+  font-weight: 400;
+}
+
+/* 大纲模式 */
+.outline-card-cluster {
+  padding: 4px 0;
+}
+.outline-title-badge {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  opacity: 0.9;
+}
+.outline-tree-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.outline-node {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13.5px;
+}
+.outline-node.level-1 { font-weight: 600; margin-top: 4px; }
+.outline-node.level-2 { padding-left: 14px; opacity: 0.95; }
+.outline-node.level-3 { padding-left: 28px; opacity: 0.85; font-size: 12.5px; }
+.outline-node.level-4 { padding-left: 42px; opacity: 0.75; font-size: 12px; }
+.node-num {
+  font-weight: 700;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+/* 全文长图模式元素 */
+.full-article-cluster .card-heading {
+  margin: 16px 0 8px 0;
+  font-weight: 700;
+}
+.full-article-cluster .card-heading.h1 { font-size: 18px; }
+.full-article-cluster .card-heading.h2 { font-size: 16px; }
+.full-article-cluster .card-heading.h3 { font-size: 15px; }
+.full-article-cluster .card-p {
+  margin: 8px 0;
+  line-height: 1.68;
+}
+.full-article-cluster .card-list {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+.full-article-cluster .card-list li {
+  margin: 4px 0;
+}
+.card-callout {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.card-code-block {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  overflow-x: auto;
+}
+.card-highlight {
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.card-inline-code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12.5px;
+  background: rgba(125, 125, 125, 0.15);
+}
+.card-wikilink {
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* 数学公式呈现 */
+.card-math-block {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(125, 125, 125, 0.1);
+  font-family: "KaTeX_Math", "Times New Roman", Cambria Math, serif;
+  font-size: 15px;
+  text-align: center;
+  overflow-x: auto;
+}
+.card-math-inline {
+  padding: 0 3px;
+  font-family: "KaTeX_Math", "Times New Roman", Cambria Math, serif;
+  font-style: italic;
+}
+
+/* 表格排版 */
+.card-table-wrap {
+  margin: 12px 0;
+  overflow-x: auto;
+}
+.card-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.card-table th, .card-table td {
+  padding: 6px 10px;
+  border: 1px solid rgba(125, 125, 125, 0.25);
+  text-align: left;
+}
+.card-table th {
+  font-weight: 600;
+  background: rgba(125, 125, 125, 0.12);
+}
+
+/* =========================================================================
+   5. 底部栏 (Footer & QR Code)
+   ========================================================================= */
+.card-footer-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed rgba(125, 125, 125, 0.2);
+}
+.footer-left-info {
+  flex: 1;
+}
+.brand-signature {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+.brand-slogan {
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.source-hint {
+  font-size: 10px;
+}
+.footer-qr-wrap {
+  width: 80px;
+  height: 80px;
+  padding: 4px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.footer-qr-wrap .qr-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}

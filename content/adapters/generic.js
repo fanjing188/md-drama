@@ -15,12 +15,24 @@ class GenericAdapter {
                  document.querySelector('time')?.getAttribute('datetime') || 
                  new Date().toISOString().split('T')[0];
 
+    const tags = ['web-clip'];
+
+    if (typeof AdapterUtils !== 'undefined') {
+      return AdapterUtils.cleanMetadata({
+        title: title || 'Untitled',
+        author: author.trim(),
+        date: date.trim(),
+        source: window.location.href,
+        tags
+      });
+    }
+
     return {
       title: title.trim().replace(/[/\\?%*:|"<>]/g, '-'),
       author: author.trim(),
       date: date.trim(),
       source: window.location.href,
-      tags: ['web-clip']
+      tags
     };
   }
 

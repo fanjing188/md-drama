@@ -26,12 +26,23 @@ class YuqueAdapter {
     const metaDate = document.querySelector('meta[itemprop="datePublished"]');
     const date = metaDate ? (metaDate.getAttribute('content') || '').slice(0, 10) : '';
 
+    const tags = ['语雀', '知识库'];
+    if (typeof AdapterUtils !== 'undefined') {
+      return AdapterUtils.cleanMetadata({
+        title,
+        author,
+        date,
+        source: window.location.href,
+        tags
+      });
+    }
+
     return {
       title: (title || '语雀文档').trim().replace(/[/\\?%*:|"<>]/g, '-'),
       author: author,
       date: date || new Date().toISOString().split('T')[0],
       source: window.location.href,
-      tags: ['语雀', '知识库']
+      tags: tags
     };
   }
 

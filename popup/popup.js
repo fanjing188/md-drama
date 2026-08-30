@@ -1,14 +1,179 @@
+// popup/popup.js - MD抓吗 弹窗主交互控制器 (双模式抓取 + 6节点像素进度 + 优雅分享卡片导出 + 5状态机与全键盘流)
+
+// 1. 统一 UI 状态机定义
+const UIState = {
+  IDLE: 'STATE_IDLE',                     // 初始待命状态（当前页模式 / 粘贴 URL 模式）
+  CRAWLING: 'STATE_CRAWLING',             // 6 阶段流水线抓取/保存进行中
+  SAVED: 'STATE_SAVED',                   // 自动保存成功面板
+  STUDIO: 'STATE_STUDIO',                 // 源码与渲染工作台
+  SHARE_MODAL: 'STATE_SHARE_MODAL',       // 优雅视觉分享卡片弹窗
+  HISTORY_DRAWER: 'STATE_HISTORY_DRAWER'  // 历史记录抽屉
+};
+
+if (typeof window !== 'undefined') {
+  window.UIState = UIState;
+  window.setUIState = setUIState;
+}
+
+let currentUIState = UIState.IDLE;
+let previousMainState = UIState.IDLE;
+
 let isObsidianConnected = false;
 let isCheckingObsidian = false;
+let currentSettings = null;
+let currentTabInfo = null;
+let currentExtractData = null;
+let currentSaveResult = null;
+let visualCardExporter = null;
+
+// 状态机流转控制器
+function setUIState(nextState, payload = {}) {
+  const pageInfoCard = document.getElementById('pageInfoCard');
+  const urlInputCard = document.getElementById('urlInputCard');
+  const actionDock = document.getElementById('actionDock');
+  const pipeline = document.getElementById('pipelineContainer');
+  const studioPanel = document.getElementById('studioPanel');
+  const successPanel = document.getElementById('successPanel');
+  const shareCardModal = document.getElementById('shareCardModal');
+  const historyDrawer = document.getElementById('historyDrawer');
+  const tabModeCurrent = document.getElementById('tabModeCurrent');
+  const btnPrimaryCrawl = document.getElementById('btnPrimaryCrawl');
+  const btnUrlCrawl = document.getElementById('btnUrlCrawl');
+
+  // 若目标不是模态层，则记录为主视图状态
+  if (nextState !== UIState.SHARE_MODAL && nextState !== UIState.HISTORY_DRAWER) {
+    previousMainState = nextState;
+  }
+
+  currentUIState = nextState;
+
+  // 基础视图隐藏清理 (模态层独立控制)
+  if (nextState !== UIState.SHARE_MODAL && nextState !== UIState.HISTORY_DRAWER) {
+    if (pageInfoCard) pageInfoCard.classList.add('hidden');
+    if (urlInputCard) urlInputCard.classList.add('hidden');
+    if (actionDock) actionDock.classList.add('hidden');
+    if (pipeline) pipeline.classList.add('hidden');
+    if (studioPanel) studioPanel.classList.add('hidden');
+    if (successPanel) successPanel.classList.add('hidden');
+  }
+
+  switch (nextState) {
+    case UIState.IDLE: {
+      clearError();
+      const isCurrentTabMode = tabModeCurrent ? tabModeCurrent.classList.contains('active') : true;
+      if (actionDock) actionDock.classList.remove('hidden');
+
+      if (isCurrentTabMode) {
+        if (pageInfoCard) pageInfoCard.classList.remove('hidden');
+        if (btnPrimaryCrawl) btnPrimaryCrawl.classList.remove('hidden');
+        if (btnUrlCrawl) btnUrlCrawl.classList.add('hidden');
+      } else {
+        if (urlInputCard) urlInputCard.classList.remove('hidden');
+        if (btnPrimaryCrawl) btnPrimaryCrawl.classList.add('hidden');
+        if (btnUrlCrawl) btnUrlCrawl.classList.remove('hidden');
+        const inputEl = document.getElementById('inputTargetUrl');
+        if (inputEl) inputEl.focus();
+      }
+      break;
+    }
+
+    case UIState.CRAWLING: {
+      clearError();
+      if (pipeline) pipeline.classList.remove('hidden');
+      const stage = payload.stage || 1;
+      const text = payload.text || '正在探测页面结构与容器...';
+      const percent = payload.percent || 10;
+      setPipelineStage(stage, text, percent, payload.savingDetail);
+      break;
+    }
+
+    case UIState.SAVED: {
+      clearError();
+      if (successPanel) successPanel.classList.remove('hidden');
+      const data = payload.data || currentExtractData;
+      const saveResult = payload.saveResult || currentSaveResult;
+
+      const successDocTitle = document.getElementById('successDocTitle');
+      const successDocPath = document.getElementById('successDocPath');
+      const successDocStats = document.getElementById('successDocStats');
+
+      const title = data?.metadata?.title || '无标题文档';
+      const filePath = saveResult?.path || `${currentSettings?.vaultSavePath || '03-知识库/网页剪藏'}/${title}.md`;
+      const wordCount = data?.markdown ? data.markdown.length : 0;
+      const imgCount = data?.images?.length || 0;
+
+      if (successDocTitle) successDocTitle.innerText = title;
+      if (successDocPath) successDocPath.innerText = filePath;
+      if (successDocStats) successDocStats.innerText = `📝 ${wordCount} 字 · 🖼️ ${imgCount} 张图片`;
+      break;
+    }
+
+    case UIState.STUDIO: {
+      clearError();
+      if (studioPanel) studioPanel.classList.remove('hidden');
+      const data = payload.data || currentExtractData;
+      if (data) {
+        const inputDocTitle = document.getElementById('inputDocTitle');
+        const badgeWordCount = document.getElementById('badgeWordCount');
+        const badgeImgCount = document.getElementById('badgeImgCount');
+        const markdownCode = document.getElementById('markdownCode');
+
+        if (inputDocTitle) inputDocTitle.value = data.metadata?.title || '无标题文档';
+        if (badgeWordCount) badgeWordCount.innerText = `${data.markdown?.length || 0} 字`;
+        if (badgeImgCount) badgeImgCount.innerText = `${data.images?.length || 0} 图`;
+        if (markdownCode) markdownCode.value = data.markdown || '';
+        renderTags(data.metadata?.tags || []);
+      }
+      break;
+    }
+
+    case UIState.SHARE_MODAL: {
+      if (shareCardModal) shareCardModal.classList.remove('hidden');
+      if (visualCardExporter && currentExtractData) {
+        visualCardExporter.setDocData(currentExtractData);
+        refreshShareCardPreview();
+      }
+      break;
+    }
+
+    case UIState.HISTORY_DRAWER: {
+      document.body.classList.add('history-expanded');
+      if (historyDrawer) historyDrawer.classList.remove('hidden');
+      renderHistoryList();
+      break;
+    }
+  }
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   currentSettings = await getSettings();
   await initCurrentPageInfo();
   await checkObsidianApiStatus();
-  await restoreOngoingTaskState();
 
-  // 绑定核心交互事件
-  const btnPrimaryCrawl = document.getElementById('btnPrimaryCrawl');
+  // 初始化卡片导出引擎
+  if (typeof VisualCardExporter !== 'undefined') {
+    visualCardExporter = new VisualCardExporter();
+  }
+
+  // 1. 模式切换按钮 (当前页面 vs 粘贴链接后台抓取)
+  const tabModeCurrent = document.getElementById('tabModeCurrent');
+  const tabModeUrl = document.getElementById('tabModeUrl');
+
+  if (tabModeCurrent && tabModeUrl) {
+    tabModeCurrent.addEventListener('click', () => {
+      tabModeCurrent.classList.add('active');
+      tabModeUrl.classList.remove('active');
+      setUIState(UIState.IDLE);
+    });
+
+    tabModeUrl.addEventListener('click', () => {
+      tabModeUrl.classList.add('active');
+      tabModeCurrent.classList.remove('active');
+      setUIState(UIState.IDLE);
+    });
+  }
+
+  // 2. 绑定核心抓取操作
   const btnCancelScroll = document.getElementById('btnCancelScroll');
   const btnOptions = document.getElementById('btnOptions');
   const btnHistory = document.getElementById('btnHistory');
@@ -40,7 +205,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 保存成功面板按钮
+  // 保存成功面板快捷操作
   const btnSuccessCopy = document.getElementById('btnSuccessCopy');
   const btnSuccessViewEdit = document.getElementById('btnSuccessViewEdit');
   const btnSuccessNewCrawl = document.getElementById('btnSuccessNewCrawl');
@@ -55,15 +220,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnTabEdit.addEventListener('click', () => {
       btnTabEdit.classList.add('active');
       btnTabPreview.classList.remove('active');
-      markdownCode.classList.remove('hidden');
-      markdownPreview.classList.add('hidden');
+      if (markdownCode) markdownCode.classList.remove('hidden');
+      if (markdownPreview) markdownPreview.classList.add('hidden');
     });
 
     btnTabPreview.addEventListener('click', () => {
       btnTabPreview.classList.add('active');
       btnTabEdit.classList.remove('active');
-      markdownCode.classList.add('hidden');
-      markdownPreview.classList.remove('hidden');
+      if (markdownCode) markdownCode.classList.add('hidden');
+      if (markdownPreview) markdownPreview.classList.remove('hidden');
       renderMarkdownPreview();
     });
   }
@@ -75,52 +240,80 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  btnOptions.addEventListener('click', () => chrome.runtime.openOptionsPage());
-  btnHistory.addEventListener('click', () => openHistoryDrawer());
-  btnCloseHistory.addEventListener('click', () => closeHistoryDrawer());
-  btnClearHistory.addEventListener('click', async () => {
-    await chrome.runtime.sendMessage({ action: 'clearClipHistory' });
-    renderHistoryList();
-  });
-
-  // 主抓取按钮：抓下来 (未连通 Obsidian 接口时拦截并友好提醒)
-  btnPrimaryCrawl.addEventListener('click', async () => {
-    if (currentSettings?.obsidianSyncMethod === 'rest_api') {
-      if (!isObsidianConnected) {
-        // 先进行一次快速二次嗅探（防止用户刚启动 Obsidian 尚未刷新状态）
-        await checkObsidianApiStatus(false);
-      }
-
-      if (!isObsidianConnected) {
-        if (!currentSettings?.restApiToken) {
-          displayError('⚠️ 您启用了 Obsidian REST API 直连，但尚未配置 Token。请先点击右上角「设置」或「向导」填写 API Key！');
-          showFlyoutToast('⚠️ 未配置 API Token，请先设置', false);
-        } else {
-          displayError('⚠️ Obsidian 本地接口未连通！请先打开 Obsidian 客户端（并确保 Local REST API 插件已启用）后再抓取。');
-          showFlyoutToast('⚠️ 请先打开 Obsidian 客户端再操作', false);
-        }
-        return;
-      }
-    }
-
-    runClipWorkflow(true);
-  });
-
-  btnCancelScroll.addEventListener('click', async () => {
-    if (currentTabInfo && currentTabInfo.id) {
-      chrome.tabs.sendMessage(currentTabInfo.id, { action: 'cancelAutoScroll' }).catch(() => {});
-      showFlyoutToast('已停止滚动');
-    }
-  });
-
-  btnCopyMarkdown.addEventListener('click', () => {
-    const md = assembleFinalMarkdown();
-    navigator.clipboard.writeText(md).then(() => {
-      showFlyoutToast('Markdown 已复制');
+  if (btnOptions) btnOptions.addEventListener('click', () => chrome.runtime.openOptionsPage());
+  if (btnHistory) btnHistory.addEventListener('click', () => setUIState(UIState.HISTORY_DRAWER));
+  if (btnCloseHistory) btnCloseHistory.addEventListener('click', () => closeHistoryDrawer());
+  if (btnClearHistory) {
+    btnClearHistory.addEventListener('click', async () => {
+      await chrome.runtime.sendMessage({ action: 'clearClipHistory' });
+      renderHistoryList();
     });
-  });
+  }
 
-  btnSaveToObsidian.addEventListener('click', () => saveToObsidianStudio());
+  // 当前页面主抓取按钮：抓下来
+  const btnPrimaryCrawl = document.getElementById('btnPrimaryCrawl');
+  if (btnPrimaryCrawl) {
+    btnPrimaryCrawl.addEventListener('click', async () => {
+      if (currentSettings?.obsidianSyncMethod === 'rest_api') {
+        if (!isObsidianConnected) {
+          await checkObsidianApiStatus(false);
+        }
+
+        if (!isObsidianConnected) {
+          if (!currentSettings?.restApiToken) {
+            displayError('⚠️ 您启用了 Obsidian REST API 直连，但尚未配置 Token。请先点击右上角「设置」或「向导」填写 API Key！');
+            showFlyoutToast('⚠️ 未配置 API Token，请先设置', false);
+          } else {
+            displayError('⚠️ Obsidian 本地接口未连通！请先打开 Obsidian 客户端（并确保 Local REST API 插件已启用）后再抓取。');
+            showFlyoutToast('⚠️ 请先打开 Obsidian 客户端再操作', false);
+          }
+          return;
+        }
+      }
+
+      runClipWorkflow(true);
+    });
+  }
+
+  // 后台 URL 抓取触发按钮
+  const btnUrlCrawl = document.getElementById('btnUrlCrawl');
+  if (btnUrlCrawl) {
+    btnUrlCrawl.addEventListener('click', () => {
+      startBackgroundUrlClip();
+    });
+  }
+
+  const inputTargetUrl = document.getElementById('inputTargetUrl');
+  if (inputTargetUrl) {
+    inputTargetUrl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        startBackgroundUrlClip();
+      }
+    });
+  }
+
+  if (btnCancelScroll) {
+    btnCancelScroll.addEventListener('click', async () => {
+      if (currentTabInfo && currentTabInfo.id) {
+        chrome.tabs.sendMessage(currentTabInfo.id, { action: 'cancelAutoScroll' }).catch(() => {});
+        showFlyoutToast('已停止滚动');
+      }
+    });
+  }
+
+  if (btnCopyMarkdown) {
+    btnCopyMarkdown.addEventListener('click', () => {
+      const md = assembleFinalMarkdown();
+      navigator.clipboard.writeText(md).then(() => {
+        showFlyoutToast('Markdown 已复制');
+      });
+    });
+  }
+
+  if (btnSaveToObsidian) {
+    btnSaveToObsidian.addEventListener('click', () => saveToObsidianStudio());
+  }
 
   // 成功面板快捷操作
   if (btnSuccessCopy) {
@@ -134,16 +327,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (btnSuccessViewEdit) {
     btnSuccessViewEdit.addEventListener('click', () => {
-      document.getElementById('successPanel').classList.add('hidden');
       if (currentExtractData) {
-        showStudio(currentExtractData);
+        setUIState(UIState.STUDIO, { data: currentExtractData });
       }
     });
   }
 
   if (btnSuccessNewCrawl) {
     btnSuccessNewCrawl.addEventListener('click', () => {
-      resetPopupToHome();
+      setUIState(UIState.IDLE);
     });
   }
 
@@ -164,6 +356,168 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+
+  // 3. 分享卡片弹窗与交互绑定
+  const btnSuccessShareCard = document.getElementById('btnSuccessShareCard');
+  const btnStudioShareCard = document.getElementById('btnStudioShareCard');
+  const btnCloseShareModal = document.getElementById('btnCloseShareModal');
+  const shareCardModal = document.getElementById('shareCardModal');
+  const btnCopyCardImage = document.getElementById('btnCopyCardImage');
+  const btnDownloadCardImage = document.getElementById('btnDownloadCardImage');
+
+  if (btnSuccessShareCard) {
+    btnSuccessShareCard.addEventListener('click', () => openShareCardModal());
+  }
+  if (btnStudioShareCard) {
+    btnStudioShareCard.addEventListener('click', () => openShareCardModal());
+  }
+  if (btnCloseShareModal) {
+    btnCloseShareModal.addEventListener('click', () => closeShareCardModal());
+  }
+  if (shareCardModal) {
+    shareCardModal.addEventListener('click', (e) => {
+      if (e.target === shareCardModal) {
+        closeShareCardModal();
+      }
+    });
+  }
+
+  // 主题切换按钮
+  document.querySelectorAll('.theme-pills .theme-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.theme-pills .theme-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (visualCardExporter) {
+        visualCardExporter.currentTheme = btn.getAttribute('data-theme');
+        refreshShareCardPreview();
+      }
+    });
+  });
+
+  // 模式切换按钮 (金句 / 大纲 / 全文长图)
+  document.querySelectorAll('.mode-pills .mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mode-pills .mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (visualCardExporter) {
+        visualCardExporter.currentMode = btn.getAttribute('data-mode');
+        refreshShareCardPreview();
+      }
+    });
+  });
+
+  // 复制卡片图片到剪切板
+  if (btnCopyCardImage) {
+    btnCopyCardImage.addEventListener('click', async () => {
+      const container = document.getElementById('cardRenderContainer');
+      const cardEl = container ? container.firstElementChild : null;
+      if (!cardEl || !visualCardExporter) {
+        showFlyoutToast('⚠️ 卡片内容尚未就绪', false);
+        return;
+      }
+
+      btnCopyCardImage.disabled = true;
+      btnCopyCardImage.innerHTML = '<span>⏳ 正在生成 2x 高清图...</span>';
+
+      try {
+        await visualCardExporter.copyImageToClipboard(cardEl);
+        showFlyoutToast('✓ 已复制分享图片至剪贴板，可直接粘贴！');
+      } catch (err) {
+        showFlyoutToast(`⚠️ 复制失败: ${err.message}`, false);
+      } finally {
+        btnCopyCardImage.disabled = false;
+        btnCopyCardImage.innerHTML = '<span>📋 复制图片到剪切板</span>';
+      }
+    });
+  }
+
+  // 下载 2x 高清 PNG 图片
+  if (btnDownloadCardImage) {
+    btnDownloadCardImage.addEventListener('click', async () => {
+      const container = document.getElementById('cardRenderContainer');
+      const cardEl = container ? container.firstElementChild : null;
+      if (!cardEl || !visualCardExporter) {
+        showFlyoutToast('⚠️ 卡片内容尚未就绪', false);
+        return;
+      }
+
+      btnDownloadCardImage.disabled = true;
+      btnDownloadCardImage.innerHTML = '<span>⏳ 正在导出...</span>';
+
+      try {
+        const title = (currentExtractData?.metadata?.title || '知识分享卡片').replace(/[/\\?%*:|"<>]/g, '_');
+        await visualCardExporter.downloadImage(cardEl, `${title.slice(0, 30)}_分享卡片.png`);
+        showFlyoutToast('✓ 2x 高清分享图已开始下载');
+      } catch (err) {
+        showFlyoutToast(`⚠️ 下载失败: ${err.message}`, false);
+      } finally {
+        btnDownloadCardImage.disabled = false;
+        btnDownloadCardImage.innerHTML = '<span>💾 下载高清 PNG (2x)</span>';
+      }
+    });
+  }
+
+  // 4. 全键盘快捷流绑定
+  window.addEventListener('keydown', (e) => {
+    const isInputFocused = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+    const isModifier = e.metaKey || e.ctrlKey;
+
+    // Esc 键：层级返回
+    if (e.key === 'Escape') {
+      if (currentUIState === UIState.SHARE_MODAL) {
+        e.preventDefault();
+        closeShareCardModal();
+      } else if (currentUIState === UIState.HISTORY_DRAWER) {
+        e.preventDefault();
+        closeHistoryDrawer();
+      } else if (currentUIState === UIState.STUDIO) {
+        e.preventDefault();
+        setUIState(previousMainState === UIState.SAVED ? UIState.SAVED : UIState.IDLE);
+      } else if (currentUIState === UIState.SAVED) {
+        e.preventDefault();
+        setUIState(UIState.IDLE);
+      }
+      return;
+    }
+
+    // Cmd/Ctrl + Enter: 智能触发主动作 (抓取 / 保存)
+    if (isModifier && e.key === 'Enter') {
+      e.preventDefault();
+      if (currentUIState === UIState.IDLE) {
+        const isCurrentMode = tabModeCurrent?.classList.contains('active');
+        if (isCurrentMode) {
+          btnPrimaryCrawl?.click();
+        } else {
+          startBackgroundUrlClip();
+        }
+      } else if (currentUIState === UIState.STUDIO) {
+        saveToObsidianStudio();
+      }
+      return;
+    }
+
+    // Cmd/Ctrl + Shift + S / Alt + Shift + S: 快捷分享卡片或抓取
+    if (((isModifier && e.shiftKey) || (e.altKey && e.shiftKey)) && (e.key === 's' || e.key === 'S')) {
+      e.preventDefault();
+      if (currentUIState === UIState.IDLE) {
+        btnPrimaryCrawl?.click();
+      } else if (currentUIState === UIState.SAVED || currentUIState === UIState.STUDIO) {
+        openShareCardModal();
+      }
+      return;
+    }
+
+    // Cmd/Ctrl + C: 非输入框聚焦时的快捷复制
+    if (isModifier && (e.key === 'c' || e.key === 'C') && !isInputFocused && !window.getSelection()?.toString()) {
+      if (currentUIState === UIState.SHARE_MODAL) {
+        e.preventDefault();
+        btnCopyCardImage?.click();
+      } else if (currentUIState === UIState.SAVED) {
+        e.preventDefault();
+        btnSuccessCopy?.click();
+      }
+    }
+  });
 
   // 恢复后台常驻任务状态（如果切换回该网页）
   await restoreOngoingTaskState();
@@ -288,20 +642,19 @@ async function restoreOngoingTaskState() {
   if (res && res.state) {
     const task = res.state;
     if (task.status === 'running') {
-      const pageInfoCard = document.getElementById('pageInfoCard');
-      const actionDock = document.getElementById('actionDock');
-      const pipeline = document.getElementById('pipelineContainer');
-      pageInfoCard.classList.add('hidden');
-      actionDock.classList.add('hidden');
-      pipeline.classList.remove('hidden');
-      setPipelineStage(task.stage || 2, task.stageText || '后台深度抓取中...', task.percent || 40, task.savingDetail);
+      setUIState(UIState.CRAWLING, {
+        stage: task.stage || 2,
+        text: task.stageText || '后台深度抓取中...',
+        percent: task.percent || 40,
+        savingDetail: task.savingDetail
+      });
     } else if (task.status === 'saved' && task.data) {
       currentExtractData = task.data;
       currentSaveResult = task.saveResult;
-      showSuccessScreen(task.data, task.saveResult);
+      setUIState(UIState.SAVED, { data: task.data, saveResult: task.saveResult });
     } else if (task.status === 'completed' && task.data) {
       currentExtractData = task.data;
-      showStudio(task.data);
+      setUIState(UIState.STUDIO, { data: task.data });
     }
   }
 }
@@ -341,7 +694,7 @@ function removeTagChip(idx) {
 // 渲染 Markdown 效果预览
 function renderMarkdownPreview() {
   const preview = document.getElementById('markdownPreview');
-  const code = document.getElementById('markdownCode').value;
+  const code = document.getElementById('markdownCode')?.value || '';
   if (!preview) return;
 
   let html = code
@@ -453,7 +806,7 @@ async function ensureContentScripts(tabId) {
   } catch (e) {}
 }
 
-// 执行核心剪藏工作流 (后台常驻接管，切换标签页正常执行)
+// 执行当前页面剪藏工作流 (后台常驻接管，切换标签页正常执行)
 async function runClipWorkflow(useAutoScroll) {
   clearError();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -464,20 +817,11 @@ async function runClipWorkflow(useAutoScroll) {
 
   await ensureContentScripts(tab.id);
 
-  const pageInfoCard = document.getElementById('pageInfoCard');
-  const actionDock = document.getElementById('actionDock');
-  const pipeline = document.getElementById('pipelineContainer');
-  const studioPanel = document.getElementById('studioPanel');
-  const successPanel = document.getElementById('successPanel');
-
-  // 1. 隐藏操作区，展示抓取进度板块
-  pageInfoCard.classList.add('hidden');
-  actionDock.classList.add('hidden');
-  pipeline.classList.remove('hidden');
-  studioPanel.classList.add('hidden');
-  successPanel.classList.add('hidden');
-
-  setPipelineStage(1, '正在探测页面滚动容器与结构...', 10);
+  setUIState(UIState.CRAWLING, {
+    stage: 1,
+    text: '正在探测页面滚动容器与结构...',
+    percent: 10
+  });
 
   // 监听来自 content script 的进度广播
   const progressListener = (msg) => {
@@ -502,12 +846,10 @@ async function runClipWorkflow(useAutoScroll) {
       currentExtractData = taskState.data;
       currentSaveResult = taskState.saveResult;
 
-      pipeline.classList.add('hidden');
-
       if (taskState.status === 'saved') {
-        showSuccessScreen(taskState.data, taskState.saveResult);
+        setUIState(UIState.SAVED, { data: taskState.data, saveResult: taskState.saveResult });
       } else {
-        showStudio(taskState.data);
+        setUIState(UIState.STUDIO, { data: taskState.data });
       }
     } else {
       throw new Error(res?.error || '抓取异常');
@@ -515,61 +857,107 @@ async function runClipWorkflow(useAutoScroll) {
   } catch (err) {
     logger.error('抓取发生错误', err.message);
     displayError(`抓取遇到问题: ${err.message}`);
-    pipeline.classList.add('hidden');
-    pageInfoCard.classList.remove('hidden');
-    actionDock.classList.remove('hidden');
+    setUIState(UIState.IDLE);
   } finally {
     chrome.runtime.onMessage.removeListener(progressListener);
   }
 }
 
-// 展示保存成功页面与专属 Logo
-function showSuccessScreen(data, saveResult) {
-  const successPanel = document.getElementById('successPanel');
-  const successDocTitle = document.getElementById('successDocTitle');
-  const successDocPath = document.getElementById('successDocPath');
-  const successDocStats = document.getElementById('successDocStats');
-
-  const title = data.metadata?.title || '无标题文档';
-  const filePath = saveResult?.path || `${currentSettings.vaultSavePath || '03-知识库/网页剪藏'}/${title}.md`;
-  const wordCount = data.markdown ? data.markdown.length : 0;
-  const imgCount = data.images?.length || 0;
-
-  successDocTitle.innerText = title;
-  successDocPath.innerText = filePath;
-  successDocStats.innerText = `📝 ${wordCount} 字 · 🖼️ ${imgCount} 张图片`;
-
-  document.getElementById('pipelineContainer').classList.add('hidden');
-  document.getElementById('pageInfoCard').classList.add('hidden');
-  document.getElementById('actionDock').classList.add('hidden');
-  document.getElementById('studioPanel').classList.add('hidden');
-  successPanel.classList.remove('hidden');
-}
-
-// 重置回首页初始操作状态
-function resetPopupToHome() {
-  document.getElementById('successPanel').classList.add('hidden');
-  document.getElementById('studioPanel').classList.add('hidden');
-  document.getElementById('pipelineContainer').classList.add('hidden');
-  document.getElementById('pageInfoCard').classList.remove('hidden');
-  document.getElementById('actionDock').classList.remove('hidden');
+// 执行后台静默 URL 自动解析与抓取工作流 (利用浏览器当前登录态与 Session)
+async function startBackgroundUrlClip() {
   clearError();
-  checkObsidianApiStatus();
+  const inputEl = document.getElementById('inputTargetUrl');
+  const targetUrl = inputEl ? inputEl.value.trim() : '';
+
+  if (!targetUrl) {
+    displayError('请输入要抓取的网页文章链接');
+    showFlyoutToast('⚠️ 请输入链接', false);
+    if (inputEl) inputEl.focus();
+    return;
+  }
+
+  const checkAutoScroll = document.getElementById('checkUrlAutoScroll');
+  const useAutoScroll = checkAutoScroll ? checkAutoScroll.checked : true;
+
+  if (currentSettings?.obsidianSyncMethod === 'rest_api') {
+    if (!isObsidianConnected) {
+      await checkObsidianApiStatus(false);
+    }
+    if (!isObsidianConnected) {
+      if (!currentSettings?.restApiToken) {
+        displayError('⚠️ 您启用了 Obsidian REST API 直连，但尚未配置 Token。请先点击右上角「设置」填写 API Key！');
+        showFlyoutToast('⚠️ 未配置 API Token，请先设置', false);
+      } else {
+        displayError('⚠️ Obsidian 本地接口未连通！请先打开 Obsidian 客户端后再抓取。');
+        showFlyoutToast('⚠️ 请先打开 Obsidian 客户端', false);
+      }
+      return;
+    }
+  }
+
+  setUIState(UIState.CRAWLING, {
+    stage: 1,
+    text: '正在后台静默打开并探测页面...',
+    percent: 10
+  });
+
+  const progressListener = (msg) => {
+    if (msg.action === 'workflowProgress' && msg.state) {
+      const st = msg.state;
+      setPipelineStage(st.stage || 2, st.stageText || '后台深度解析中...', st.percent || 50, st.savingDetail);
+    }
+  };
+  chrome.runtime.onMessage.addListener(progressListener);
+
+  try {
+    const res = await chrome.runtime.sendMessage({
+      action: 'startBackgroundUrlClip',
+      url: targetUrl,
+      useAutoScroll: useAutoScroll
+    });
+
+    if (res && res.success && res.state) {
+      const taskState = res.state;
+      currentExtractData = taskState.data;
+      currentSaveResult = taskState.saveResult;
+
+      if (taskState.status === 'saved') {
+        setUIState(UIState.SAVED, { data: taskState.data, saveResult: taskState.saveResult });
+      } else {
+        setUIState(UIState.STUDIO, { data: taskState.data });
+      }
+    } else {
+      throw new Error(res?.error || '后台抓取异常');
+    }
+  } catch (err) {
+    logger.error('后台抓取发生错误', err.message);
+    displayError(`后台抓取遇到问题: ${err.message}`);
+    setUIState(UIState.IDLE);
+  } finally {
+    chrome.runtime.onMessage.removeListener(progressListener);
+  }
 }
 
-function showStudio(data) {
-  const studioPanel = document.getElementById('studioPanel');
-  const inputDocTitle = document.getElementById('inputDocTitle');
-  const badgeWordCount = document.getElementById('badgeWordCount');
-  const badgeImgCount = document.getElementById('badgeImgCount');
-  const markdownCode = document.getElementById('markdownCode');
+// 优雅分享卡片弹窗控制
+function openShareCardModal() {
+  if (!currentExtractData) {
+    showFlyoutToast('⚠️ 暂无抓取数据，请先抓取文章', false);
+    return;
+  }
 
-  studioPanel.classList.remove('hidden');
-  inputDocTitle.value = data.metadata?.title || '无标题文档';
-  badgeWordCount.innerText = `${data.markdown?.length || 0} 字`;
-  badgeImgCount.innerText = `${data.images?.length || 0} 图`;
-  markdownCode.value = data.markdown || '';
-  renderTags(data.metadata?.tags || []);
+  setUIState(UIState.SHARE_MODAL);
+}
+
+function closeShareCardModal() {
+  const modal = document.getElementById('shareCardModal');
+  if (modal) modal.classList.add('hidden');
+  currentUIState = previousMainState;
+}
+
+function refreshShareCardPreview() {
+  const container = document.getElementById('cardRenderContainer');
+  if (!container || !visualCardExporter) return;
+  visualCardExporter.renderCardElement(container);
 }
 
 function assembleFinalMarkdown() {
@@ -581,8 +969,10 @@ function assembleFinalMarkdown() {
 async function saveToObsidianStudio() {
   if (!currentExtractData) return;
   const btnSave = document.getElementById('btnSaveToObsidian');
-  btnSave.disabled = true;
-  btnSave.innerHTML = `<span>⏳ 写入中...</span>`;
+  if (btnSave) {
+    btnSave.disabled = true;
+    btnSave.innerHTML = `<span>⏳ 写入中...</span>`;
+  }
 
   const finalMarkdown = assembleFinalMarkdown();
   const imgCount = currentExtractData.images?.length || 0;
@@ -612,29 +1002,28 @@ async function saveToObsidianStudio() {
     showFlyoutToast(toastText, failedCount === 0);
 
     // 保存后切换到成功面板
-    showSuccessScreen(currentExtractData, res.result);
+    setUIState(UIState.SAVED, { data: currentExtractData, saveResult: res.result });
   } catch (err) {
     displayError(`保存失败: ${err.message}`);
   } finally {
-    btnSave.disabled = false;
-    btnSave.innerHTML = `<span>💾 同步至 Obsidian</span>`;
+    if (btnSave) {
+      btnSave.disabled = false;
+      btnSave.innerHTML = `<span>💾 同步至 Obsidian</span>`;
+    }
   }
 }
 
 // 历史记录抽屉 (展开弹窗并支持展示10+条记录向下滑动)
-async function openHistoryDrawer() {
-  document.body.classList.add('history-expanded');
-  document.getElementById('historyDrawer').classList.remove('hidden');
-  await renderHistoryList();
-}
-
 function closeHistoryDrawer() {
   document.body.classList.remove('history-expanded');
-  document.getElementById('historyDrawer').classList.add('hidden');
+  const drawer = document.getElementById('historyDrawer');
+  if (drawer) drawer.classList.add('hidden');
+  currentUIState = previousMainState;
 }
 
 async function renderHistoryList() {
   const container = document.getElementById('historyListContainer');
+  if (!container) return;
   const res = await chrome.runtime.sendMessage({ action: 'getClipHistory' });
   const list = res?.history || [];
 

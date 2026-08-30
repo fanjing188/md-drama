@@ -282,6 +282,80 @@ async function executeBackgroundCrawlWorkflow(tabId, tabUrl, useAutoScroll = tru
   }
 }
 
+// 基于输入 URL 的后台静默全自动抓取与归档（无缝复用当前浏览器登录态与 Cookie，抓取完成后自动关闭后台标签）
+async function executeBackgroundUrlClip({ url, useAutoScroll = true }) {
+  if (!url || typeof url !== 'string') {
+    throw new Error('请输入有效的网页文章链接');
+  }
+
+  let targetUrl = url.trim();
+  if (!/^https?:\/\//i.test(targetUrl)) {
+    targetUrl = 'https://' + targetUrl;
+  }
+
+  // 1. 创建后台非激活静默标签（利用当前浏览器登录环境与 Cookie）
+  let bgTab = null;
+  try {
+    bgTab = await chrome.tabs.create({ url: targetUrl, active: false });
+  } catch (e) {
+    throw new Error(`创建后台标签失败: ${e.message}`);
+  }
+
+  const tabId = bgTab.id;
+
+  // 2. 等待标签页加载完成 (带超时保护与 status === 'complete' 监听)
+  const waitForTabLoaded = (tId, timeoutMs = 25000) => {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        chrome.tabs.onUpdated.removeListener(listener);
+        resolve(); // 超时后尝试继续执行
+      }, timeoutMs);
+
+      function listener(updatedTabId, changeInfo) {
+        if (updatedTabId === tId && changeInfo.status === 'complete') {
+          clearTimeout(timer);
+          chrome.tabs.onUpdated.removeListener(listener);
+          resolve();
+        }
+      }
+
+      chrome.tabs.onUpdated.addListener(listener);
+
+      // 若已经加载完毕
+      chrome.tabs.get(tId).then(t => {
+        if (t && t.status === 'complete') {
+          clearTimeout(timer);
+          chrome.tabs.onUpdated.removeListener(listener);
+          resolve();
+        }
+      }).catch(() => {});
+    });
+  };
+
+  try {
+    await waitForTabLoaded(tabId, 25000);
+    // 给 SPA / 客户端水合与动态脚本执行预留缓冲时间
+    await new Promise(r => setTimeout(r, 1200));
+
+    // 3. 注入 content scripts
+    await ensureContentScripts(tabId);
+
+    // 4. 执行全量抓取流水线
+    const taskResult = await executeBackgroundCrawlWorkflow(tabId, targetUrl, useAutoScroll);
+
+    // 5. 抓取与保存完毕后，安全关闭该后台静默标签
+    chrome.tabs.remove(tabId).catch(() => {});
+
+    return taskResult;
+  } catch (err) {
+    // 发生异常时也确保后台标签被安全关闭
+    if (tabId) {
+      chrome.tabs.remove(tabId).catch(() => {});
+    }
+    throw err;
+  }
+}
+
 async function getSettings() {
   return new Promise(resolve => chrome.storage.sync.get(null, resolve));
 }
@@ -315,6 +389,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const useAutoScroll = Boolean(request.useAutoScroll);
 
     executeBackgroundCrawlWorkflow(tabId, tabUrl, useAutoScroll)
+      .then(state => sendResponse({ success: true, state }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
+  // 启动基于输入 URL 的后台静默自动抓取与归档（利用当前浏览器登录环境）
+  if (request.action === 'startBackgroundUrlClip') {
+    executeBackgroundUrlClip({
+      url: request.url,
+      useAutoScroll: request.useAutoScroll !== false
+    })
       .then(state => sendResponse({ success: true, state }))
       .catch(err => sendResponse({ success: false, error: err.message }));
     return true;
@@ -454,11 +539,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+// 并发池执行器：控制并发数，避免图片过多卡顿或压垮本地 Obsidian REST API
+async function runConcurrentPool(items, limit, workerFn) {
+  const results = [];
+  const executing = new Set();
+  for (const item of items) {
+    const p = Promise.resolve().then(() => workerFn(item));
+    results.push(p);
+    executing.add(p);
+    const clean = () => executing.delete(p);
+    p.then(clean, clean);
+    if (executing.size >= limit) {
+      await Promise.race(executing);
+    }
+  }
+  return Promise.all(results);
+}
+
 // 后台保存处理器（整篇保存与划选保存共用全局统一图片资源配置）
 async function saveToObsidianBackend(extractData, url, settings, tabId, isSelection = false) {
   const isAppendMode = isSelection && (settings.selectionSaveMode === 'append_file');
   let fullPath = '';
   const failedImages = [];
+  const failedImageDetails = [];
   const title = extractData.metadata.title || '无标题文档';
   const wordCount = extractData.markdown ? extractData.markdown.length : 0;
   const imgCount = extractData.images?.length || 0;
@@ -526,25 +629,12 @@ async function saveToObsidianBackend(extractData, url, settings, tabId, isSelect
     fullPath = `${targetFolder}/${filename}`.replace(/\/+/g, '/');
 
     if (settings.obsidianSyncMethod === 'rest_api') {
-      // 1. 全局统一图片附件保存
+      // 1. 全局统一图片附件并发限流保存 (并发度 6)
       if (settings.imageHandling === 'download' && extractData.images?.length > 0) {
-        let currentImgIdx = 0;
+        let completedImgCount = 0;
         const totalImgs = extractData.images.length;
-        for (const img of extractData.images) {
-          currentImgIdx++;
-          if (tabId) {
-            const saveState = {
-              tabId,
-              status: 'running',
-              stage: 6,
-              stageText: `正在归档至 Obsidian (图片 ${currentImgIdx}/${totalImgs})...`,
-              percent: Math.min(98, 92 + Math.round((currentImgIdx / totalImgs) * 5)),
-              savingDetail: `正在保存第 ${currentImgIdx}/${totalImgs} 张图片：${img.filename}`
-            };
-            activeCrawlTasks.set(tabId, saveState);
-            chrome.runtime.sendMessage({ action: 'workflowProgress', state: saveState }).catch(() => {});
-          }
 
+        await runConcurrentPool(extractData.images, 6, async (img) => {
           try {
             const imgPath = `${targetFolder}/${attachmentDirName}/${img.filename}`.replace(/\/+/g, '/');
             const imgBase64 = await fetchImageAsBase64(img.originalUrl, tabId);
@@ -554,11 +644,36 @@ async function saveToObsidianBackend(extractData, url, settings, tabId, isSelect
               isBinary: true,
               settings: settings
             });
+            completedImgCount++;
           } catch (e) {
             console.warn('图片附件保存跳过:', img.filename, e);
             failedImages.push(img.filename);
+            failedImageDetails.push({ filename: img.filename, originalUrl: img.originalUrl });
           }
-        }
+
+          if (tabId) {
+            const saveState = {
+              tabId,
+              status: 'running',
+              stage: 6,
+              stageText: `正在归档至 Obsidian (图片 ${completedImgCount + failedImages.length}/${totalImgs})...`,
+              percent: Math.min(98, 92 + Math.round(((completedImgCount + failedImages.length) / totalImgs) * 5)),
+              savingDetail: `已处理 ${completedImgCount + failedImages.length}/${totalImgs} 张图片`
+            };
+            activeCrawlTasks.set(tabId, saveState);
+            chrome.runtime.sendMessage({ action: 'workflowProgress', state: saveState }).catch(() => {});
+          }
+        });
+      }
+
+      // 归档自愈：若有个别图片因网络或防盗链下载失败，在正文末尾追加备忘 callout
+      let finalMarkdown = extractData.markdown;
+      if (failedImageDetails.length > 0) {
+        let failNote = '\n\n> [!WARNING] 资源本地化提示\n> 本文在保存时有 ' + failedImageDetails.length + ' 张图片未能成功下载，已为您保留原图访问链接：\n';
+        failedImageDetails.forEach((f, idx) => {
+          failNote += `> - 图 ${idx + 1} (${f.filename}): [点击查看原始图片](${f.originalUrl})\n`;
+        });
+        finalMarkdown += failNote;
       }
 
       // 2. 写入 Markdown
@@ -577,29 +692,17 @@ async function saveToObsidianBackend(extractData, url, settings, tabId, isSelect
 
       await saveToObsidianRestApi({
         path: fullPath,
-        content: extractData.markdown,
+        content: finalMarkdown,
         isBinary: false,
         settings: settings
       });
     } else {
-      // 导出文件模式
+      // 导出文件模式 (并发度 6)
       if (settings.imageHandling === 'download' && extractData.images?.length > 0) {
-        let currentImgIdx = 0;
+        let completedImgCount = 0;
         const totalImgs = extractData.images.length;
-        for (const img of extractData.images) {
-          currentImgIdx++;
-          if (tabId) {
-            const saveState = {
-              tabId,
-              status: 'running',
-              stage: 6,
-              stageText: `正在导出图片资源 (${currentImgIdx}/${totalImgs})...`,
-              percent: Math.min(98, 92 + Math.round((currentImgIdx / totalImgs) * 5)),
-              savingDetail: `正在导出图片：${img.filename}`
-            };
-            activeCrawlTasks.set(tabId, saveState);
-            chrome.runtime.sendMessage({ action: 'workflowProgress', state: saveState }).catch(() => {});
-          }
+
+        await runConcurrentPool(extractData.images, 6, async (img) => {
           const imgPath = `Obsidian_Vault/${targetFolder}/${attachmentDirName}/${img.filename}`.replace(/\/+/g, '/');
           try {
             const imgBase64 = await fetchImageAsBase64(img.originalUrl, tabId);
@@ -608,6 +711,7 @@ async function saveToObsidianBackend(extractData, url, settings, tabId, isSelect
               content: imgBase64,
               isDataUrl: true
             });
+            completedImgCount++;
           } catch (e) {
             try {
               await handleDownload({
@@ -615,11 +719,35 @@ async function saveToObsidianBackend(extractData, url, settings, tabId, isSelect
                 content: img.originalUrl,
                 isDataUrl: true
               });
+              completedImgCount++;
             } catch (e2) {
               failedImages.push(img.filename);
+              failedImageDetails.push({ filename: img.filename, originalUrl: img.originalUrl });
             }
           }
-        }
+
+          if (tabId) {
+            const saveState = {
+              tabId,
+              status: 'running',
+              stage: 6,
+              stageText: `正在导出图片资源 (${completedImgCount + failedImages.length}/${totalImgs})...`,
+              percent: Math.min(98, 92 + Math.round(((completedImgCount + failedImages.length) / totalImgs) * 5)),
+              savingDetail: `正在导出图片：${img.filename}`
+            };
+            activeCrawlTasks.set(tabId, saveState);
+            chrome.runtime.sendMessage({ action: 'workflowProgress', state: saveState }).catch(() => {});
+          }
+        });
+      }
+
+      let finalMarkdown = extractData.markdown;
+      if (failedImageDetails.length > 0) {
+        let failNote = '\n\n> [!WARNING] 资源本地化提示\n> 本文在保存时有 ' + failedImageDetails.length + ' 张图片未能成功下载，已为您保留原图访问链接：\n';
+        failedImageDetails.forEach((f, idx) => {
+          failNote += `> - 图 ${idx + 1} (${f.filename}): [点击查看原始图片](${f.originalUrl})\n`;
+        });
+        finalMarkdown += failNote;
       }
 
       if (tabId) {
@@ -637,7 +765,7 @@ async function saveToObsidianBackend(extractData, url, settings, tabId, isSelect
 
       await handleDownload({
         filename: `Obsidian_Vault/${fullPath}`,
-        content: extractData.markdown,
+        content: finalMarkdown,
         allowNameFallback: true
       });
     }

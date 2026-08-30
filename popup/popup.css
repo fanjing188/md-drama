@@ -1147,6 +1147,339 @@ body.history-expanded {
   color: #991B1B;
 }
 
+/* =========================================================================
+   9. 抓取源模式切换栏 (当前页面 vs 粘贴链接后台抓取)
+   ========================================================================= */
+.source-mode-tabs {
+  display: flex;
+  background: var(--pixel-bg-subtle);
+  border: 1.5px solid var(--pixel-border);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 3px;
+}
+
+.source-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pixel-text-sub);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.source-tab:hover {
+  color: var(--pixel-text);
+}
+
+.source-tab.active {
+  background: #FFFFFF;
+  color: var(--pixel-text);
+  font-weight: 800;
+  border: 1.5px solid var(--pixel-border);
+  box-shadow: 1px 1px 0 var(--pixel-border);
+}
+
+/* 粘贴链接输入卡片 */
+.url-input-card {
+  background: var(--pixel-bg-card);
+  border: 2px solid var(--pixel-border);
+  box-shadow: var(--pixel-shadow);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.url-input-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--pixel-text);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.url-input-wrap {
+  width: 100%;
+}
+
+.url-text-field {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--pixel-bg-input);
+  border: 1.5px solid var(--pixel-border);
+  border-radius: 4px;
+  padding: 7px 9px;
+  font-size: 11.5px;
+  color: var(--pixel-text);
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.url-text-field:focus {
+  background: #FFFFFF;
+  border-color: #2563EB;
+  box-shadow: 1px 1px 0 var(--pixel-border);
+}
+
+.url-options-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--pixel-text-sub);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.checkbox-label input[type="checkbox"] {
+  accent-color: #2D2721;
+  cursor: pointer;
+}
+
+.hero-cta.hero-cta-url {
+  background: #C8B6FF;
+}
+.hero-cta.hero-cta-url:hover {
+  background: #B39DFF;
+}
+
+/* =========================================================================
+   10. 分享卡片按钮与弹窗 (Share Card Modal)
+   ========================================================================= */
+.btn-success-action.share-btn {
+  background: #FFE66D;
+}
+.btn-success-action.share-btn:hover {
+  background: #F7D038;
+}
+
+.btn-share {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: #FFE66D;
+  border: 2px solid var(--pixel-border);
+  box-shadow: var(--pixel-shadow-sm);
+  color: var(--pixel-text);
+  padding: 7px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.btn-share:hover {
+  background: #F7D038;
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--pixel-border);
+}
+.btn-share:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 var(--pixel-border);
+}
+
+.share-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  box-sizing: border-box;
+  animation: modalFadeIn 0.2s ease;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.share-modal-dialog {
+  width: 100%;
+  max-width: 335px;
+  max-height: 540px;
+  background: var(--pixel-bg-canvas);
+  border: 2.5px solid var(--pixel-border);
+  box-shadow: 5px 5px 0 var(--pixel-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.share-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 2px solid var(--pixel-border);
+  background: var(--pixel-bg-subtle);
+}
+
+.modal-title-cluster {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.modal-title-text {
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--pixel-text);
+}
+
+.modal-close-btn {
+  background: var(--pixel-bg-card);
+  border: 1.5px solid var(--pixel-border);
+  border-radius: 3px;
+  font-size: 14px;
+  font-weight: 800;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--pixel-text);
+}
+.modal-close-btn:hover {
+  background: var(--pixel-coral);
+  color: #FFFFFF;
+}
+
+.share-customizer-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #FFFFFF;
+  border-bottom: 1.5px solid var(--pixel-border-light);
+}
+
+.customizer-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.group-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--pixel-text-sub);
+  white-space: nowrap;
+}
+
+.theme-pills, .mode-pills {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.theme-btn, .mode-btn {
+  border: 1px solid var(--pixel-border);
+  background: var(--pixel-bg-subtle);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--pixel-text);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.1s ease;
+}
+
+.theme-btn:hover, .mode-btn:hover {
+  background: var(--pixel-yellow);
+}
+
+.theme-btn.active, .mode-btn.active {
+  background: var(--pixel-border);
+  color: #FFFFFF;
+  font-weight: 800;
+}
+
+.share-card-viewport {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  background: #2D2721;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 260px;
+  max-height: 340px;
+}
+
+.share-modal-footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 2px solid var(--pixel-border);
+  background: var(--pixel-bg-subtle);
+}
+
+.btn-card-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 2px solid var(--pixel-border);
+  box-shadow: 2px 2px 0 var(--pixel-border);
+  border-radius: 4px;
+  padding: 7px 6px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+.btn-card-action:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--pixel-border);
+}
+.btn-card-action:active {
+  transform: translate(1px, 1px);
+  box-shadow: 0 0 0 var(--pixel-border);
+}
+.btn-card-action.primary {
+  background: var(--pixel-green);
+  color: var(--pixel-text);
+}
+.btn-card-action.primary:hover {
+  background: #5EE2A3;
+}
+.btn-card-action.hollow {
+  background: #FFFFFF;
+  color: var(--pixel-text);
+}
+.btn-card-action.hollow:hover {
+  background: var(--pixel-yellow);
+}
+
 .history-time {
   color: var(--pixel-text-sub);
   font-weight: 600;

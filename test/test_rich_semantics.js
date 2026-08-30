@@ -7,6 +7,7 @@ const assert = require('assert');
 const turndownCode = fs.readFileSync(path.join(__dirname, '../lib/turndown.js'), 'utf8');
 const turndownGfmCode = fs.readFileSync(path.join(__dirname, '../lib/turndown-plugin-gfm.js'), 'utf8');
 const cleanerCode = fs.readFileSync(path.join(__dirname, '../content/cleaner.js'), 'utf8');
+const utilsCode = fs.readFileSync(path.join(__dirname, '../content/adapters/utils.js'), 'utf8');
 const transformersCode = fs.readFileSync(path.join(__dirname, '../content/pipeline/transformers.js'), 'utf8');
 const parserEngineCode = fs.readFileSync(path.join(__dirname, '../content/pipeline/parser-engine.js'), 'utf8');
 
@@ -24,6 +25,7 @@ function createEnv(html, url) {
   dom.window.eval(turndownCode);
   dom.window.eval(turndownGfmCode);
   dom.window.eval(cleanerCode);
+  dom.window.eval(utilsCode);
   dom.window.eval(transformersCode);
   dom.window.eval(parserEngineCode);
   dom.window.eval(genericCode);
